@@ -41,6 +41,7 @@ int            orig_samples_per_frame = 0;
 short*         samples_buffer;
 short*         conversion_buffer;
 int            usestereo = 1;
+static double  applied_cpu_clock_scale = 0; /* last cpu_clock_scale core option value applied to CPU 0 */
 
 
 /* MAME data structures to store and translate keyboard state */
@@ -417,13 +418,14 @@ void retro_run (void)
     }
   }
 
-  if (options.cpu_clock_scale)
+  /* only apply the core option when its value changes, so that other changes to
+     CPU 0's clock scale (for example cheats or the MAME overclock UI) are not
+     overwritten every frame */
+  if (options.cpu_clock_scale && options.cpu_clock_scale != applied_cpu_clock_scale)
   {
-    if (cpunum_get_clockscale(0) != options.cpu_clock_scale)
-    {
-      log_cb(RETRO_LOG_DEBUG, LOGPRE "changing cpu clock scale from %lf to %lf\n",cpunum_get_clockscale(0),options.cpu_clock_scale);
-      cpunum_set_clockscale(0, options.cpu_clock_scale);
-    }
+    log_cb(RETRO_LOG_DEBUG, LOGPRE "changing cpu clock scale from %lf to %lf\n",cpunum_get_clockscale(0),options.cpu_clock_scale);
+    cpunum_set_clockscale(0, options.cpu_clock_scale);
+    applied_cpu_clock_scale = options.cpu_clock_scale;
   }
   mame_frame();
   frame_run_since_load = 1;
@@ -442,6 +444,7 @@ void retro_run (void)
 void retro_unload_game(void)
 {
     mame_done();
+    applied_cpu_clock_scale = 0;
     /* do we need to be freeing things here? */
 
     free(options.romset_filename_noext);
