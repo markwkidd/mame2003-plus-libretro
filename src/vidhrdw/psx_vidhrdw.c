@@ -171,6 +171,9 @@ static UINT32 m_n_displaystartx;
 static UINT32 m_n_displaystarty;
 static UINT32 m_n_gpustatus;
 static UINT32 m_n_gpuinfo;
+/* the light gun coordinates latched by the GPU (some arcade boards) */
+static UINT32 m_n_lightgun_x;
+static UINT32 m_n_lightgun_y;
 static UINT32 m_n_screenwidth;
 static UINT32 m_n_screenheight;
 static UINT32 m_n_drawmode;
@@ -538,6 +541,8 @@ static int psx_gpu_init( int n_width, int n_height )
 	m_n_gpustatus = 0x14802000;
 	m_n_drawmode = 0;
 	m_n_gpuinfo = 0;
+	m_n_lightgun_x = 0;
+	m_n_lightgun_y = 0;
 	m_n_gpu_buffer_offset = 0;
 
 	m_n_vram_size = n_width * n_height;
@@ -665,6 +670,8 @@ static int psx_gpu_init( int n_width, int n_height )
 	state_save_register_UINT32( "psx", 0, "m_n_displaystarty", &m_n_displaystarty, 1 );
 	state_save_register_UINT32( "psx", 0, "m_n_gpustatus", &m_n_gpustatus, 1 );
 	state_save_register_UINT32( "psx", 0, "m_n_gpuinfo", &m_n_gpuinfo, 1 );
+	state_save_register_UINT32( "psx", 0, "m_n_lightgun_x", &m_n_lightgun_x, 1 );
+	state_save_register_UINT32( "psx", 0, "m_n_lightgun_y", &m_n_lightgun_y, 1 );
 	state_save_register_UINT32( "psx", 0, "m_n_screenwidth", &m_n_screenwidth, 1 );
 	state_save_register_UINT32( "psx", 0, "m_n_screenheight", &m_n_screenheight, 1 );
 	state_save_register_UINT32( "psx", 0, "m_n_drawmode", &m_n_drawmode, 1 );
@@ -1076,7 +1083,25 @@ f  e  d  c| b| a  9| 8  7| 6  5| 4| 3  2  1  0
 	n_v.d += n_dv;
 
 #define FLATTEXTUREDRECTANGLEUPDATE \
-	n_u++;
+	n_u += n_du;
+
+/* texture flip of the rectangles (bits 12 and 13 of the draw mode), on
+   the type 2 GPU only, as MAME SPRITESETUP: the texture is read right to
+   left and bottom to top */
+#define SPRITESETUP \
+	n_du = 1; \
+	n_dv = 1; \
+	if( m_n_gputype == 2 ) \
+	{ \
+		if( ( m_n_drawmode & 0x1000 ) != 0 ) \
+		{ \
+			n_du = -1; \
+		} \
+		if( ( m_n_drawmode & 0x2000 ) != 0 ) \
+		{ \
+			n_dv = -1; \
+		} \
+	}
 
 #define TEXTURE4BIT( TXV, TXU ) \
 	while( n_distance > 0 ) \
@@ -3331,6 +3356,8 @@ static void FlatTexturedRectangle( void )
 	PAIR n_b;
 	UINT8 n_u;
 	UINT8 n_v;
+	int n_du;
+	int n_dv;
 
 	INT16 n_distance;
 	UINT32 n_h;
@@ -3356,6 +3383,7 @@ static void FlatTexturedRectangle( void )
 	n_cluty = ( m_packet.FlatTexturedRectangle.n_texture.w.h >> 6 ) & 0x3ff;
 
 	TEXTURESETUP( m_n_drawmode )
+	SPRITESETUP
 
 	switch( n_cmd & 0x01 )
 	{
@@ -3385,16 +3413,22 @@ static void FlatTexturedRectangle( void )
 		{
 			if( ( (INT32)m_n_drawarea_x1 - n_x ) > 0 )
 			{
-				n_u += ( m_n_drawarea_x1 - n_x );
+				n_u += ( m_n_drawarea_x1 - n_x ) * n_du;
 				n_distance -= ( m_n_drawarea_x1 - n_x );
 				n_x = m_n_drawarea_x1;
 			}
+			if( n_du != 1 )
+			{
+				/* flipped: the generic code (the span code only steps forward here) */
+				TEXTUREFILL( FLATTEXTUREDRECTANGLEUPDATE, n_u, n_v );
+			}
+			else
 			TEXTURESPAN( INT16, (UINT32)n_u << 16, 1 << 16, (UINT32)n_v << 16, 0, 0xff, 0xff, 0, 0, 0 )
 			{
 				TEXTUREFILL( FLATTEXTUREDRECTANGLEUPDATE, n_u, n_v );
 			}
 		}
-		n_v++;
+		n_v += n_dv;
 		n_y++;
 		n_h--;
 	}
@@ -3429,6 +3463,8 @@ static void Sprite8x8( void )
 	PAIR n_b;
 	UINT8 n_u;
 	UINT8 n_v;
+	int n_du;
+	int n_dv;
 
 	INT16 n_distance;
 	UINT32 n_h;
@@ -3454,10 +3490,21 @@ static void Sprite8x8( void )
 	n_cluty = ( m_packet.Sprite8x8.n_texture.w.h >> 6 ) & 0x3ff;
 
 	TEXTURESETUP( m_n_drawmode )
+	SPRITESETUP
 
-	n_r.w.h = BGR_R( m_packet.Sprite8x8.n_bgr ); n_r.w.l = 0;
-	n_g.w.h = BGR_G( m_packet.Sprite8x8.n_bgr ); n_g.w.l = 0;
-	n_b.w.h = BGR_B( m_packet.Sprite8x8.n_bgr ); n_b.w.l = 0;
+	/* raw texture (bit 0 of the command): no colour modulation, as MAME */
+	if( ( n_cmd & 0x01 ) != 0 )
+	{
+		n_r.w.h = 0x80; n_r.w.l = 0;
+		n_g.w.h = 0x80; n_g.w.l = 0;
+		n_b.w.h = 0x80; n_b.w.l = 0;
+	}
+	else
+	{
+		n_r.w.h = BGR_R( m_packet.Sprite8x8.n_bgr ); n_r.w.l = 0;
+		n_g.w.h = BGR_G( m_packet.Sprite8x8.n_bgr ); n_g.w.l = 0;
+		n_b.w.h = BGR_B( m_packet.Sprite8x8.n_bgr ); n_b.w.l = 0;
+	}
 
 	n_v = TEXTURE_V( m_packet.Sprite8x8.n_texture );
 	n_y = COORD_Y( m_packet.Sprite8x8.n_coord ) + m_n_drawoffset_y;
@@ -3473,16 +3520,22 @@ static void Sprite8x8( void )
 		{
 			if( ( (INT32)m_n_drawarea_x1 - n_x ) > 0 )
 			{
-				n_u += ( m_n_drawarea_x1 - n_x );
+				n_u += ( m_n_drawarea_x1 - n_x ) * n_du;
 				n_distance -= ( m_n_drawarea_x1 - n_x );
 				n_x = m_n_drawarea_x1;
 			}
+			if( n_du != 1 )
+			{
+				/* flipped: the generic code (the span code only steps forward here) */
+				TEXTUREFILL( FLATTEXTUREDRECTANGLEUPDATE, n_u, n_v );
+			}
+			else
 			TEXTURESPAN( INT16, (UINT32)n_u << 16, 1 << 16, (UINT32)n_v << 16, 0, 0xff, 0xff, 0, 0, 0 )
 			{
 				TEXTUREFILL( FLATTEXTUREDRECTANGLEUPDATE, n_u, n_v );
 			}
 		}
-		n_v++;
+		n_v += n_dv;
 		n_y++;
 		n_h--;
 	}
@@ -3517,6 +3570,8 @@ static void Sprite16x16( void )
 	PAIR n_b;
 	UINT8 n_u;
 	UINT8 n_v;
+	int n_du;
+	int n_dv;
 
 	INT16 n_distance;
 	UINT32 n_h;
@@ -3542,10 +3597,21 @@ static void Sprite16x16( void )
 	n_cluty = ( m_packet.Sprite16x16.n_texture.w.h >> 6 ) & 0x3ff;
 
 	TEXTURESETUP( m_n_drawmode )
+	SPRITESETUP
 
-	n_r.w.h = BGR_R( m_packet.Sprite16x16.n_bgr ); n_r.w.l = 0;
-	n_g.w.h = BGR_G( m_packet.Sprite16x16.n_bgr ); n_g.w.l = 0;
-	n_b.w.h = BGR_B( m_packet.Sprite16x16.n_bgr ); n_b.w.l = 0;
+	/* raw texture (bit 0 of the command): no colour modulation, as MAME */
+	if( ( n_cmd & 0x01 ) != 0 )
+	{
+		n_r.w.h = 0x80; n_r.w.l = 0;
+		n_g.w.h = 0x80; n_g.w.l = 0;
+		n_b.w.h = 0x80; n_b.w.l = 0;
+	}
+	else
+	{
+		n_r.w.h = BGR_R( m_packet.Sprite16x16.n_bgr ); n_r.w.l = 0;
+		n_g.w.h = BGR_G( m_packet.Sprite16x16.n_bgr ); n_g.w.l = 0;
+		n_b.w.h = BGR_B( m_packet.Sprite16x16.n_bgr ); n_b.w.l = 0;
+	}
 
 	n_v = TEXTURE_V( m_packet.Sprite16x16.n_texture );
 	n_y = COORD_Y( m_packet.Sprite16x16.n_coord ) + m_n_drawoffset_y;
@@ -3561,16 +3627,22 @@ static void Sprite16x16( void )
 		{
 			if( ( (INT32)m_n_drawarea_x1 - n_x ) > 0 )
 			{
-				n_u += ( m_n_drawarea_x1 - n_x );
+				n_u += ( m_n_drawarea_x1 - n_x ) * n_du;
 				n_distance -= ( m_n_drawarea_x1 - n_x );
 				n_x = m_n_drawarea_x1;
 			}
+			if( n_du != 1 )
+			{
+				/* flipped: the generic code (the span code only steps forward here) */
+				TEXTUREFILL( FLATTEXTUREDRECTANGLEUPDATE, n_u, n_v );
+			}
+			else
 			TEXTURESPAN( INT16, (UINT32)n_u << 16, 1 << 16, (UINT32)n_v << 16, 0, 0xff, 0xff, 0, 0, 0 )
 			{
 				TEXTUREFILL( FLATTEXTUREDRECTANGLEUPDATE, n_u, n_v );
 			}
 		}
-		n_v++;
+		n_v += n_dv;
 		n_y++;
 		n_h--;
 	}
@@ -4318,6 +4390,12 @@ void psx_gpu_write( UINT32 *p_ram, INT32 n_size )
 	}
 }
 
+void psx_gpu_lightgun_set( int n_x, int n_y )
+{
+	m_n_lightgun_x = n_x;
+	m_n_lightgun_y = n_y;
+}
+
 WRITE32_HANDLER( psx_gpu_w )
 {
 	switch( offset )
@@ -4430,7 +4508,18 @@ WRITE32_HANDLER( psx_gpu_w )
 		case 0x09:
 			/*verboselog( 1, "not handled: GPU Control 0x09: %08x\n", data );*/
 			break;
+		case 0x0d:
+			/* reset the light gun coordinates (current MAME) */
+			m_n_lightgun_x = 0;
+			m_n_lightgun_y = 0;
+			break;
 		case 0x10:
+			if( ( data & 0xff ) == 0x08 )
+			{
+				/* the light gun coordinates (current MAME) */
+				m_n_gpuinfo = m_n_lightgun_x | ( m_n_lightgun_y << 16 );
+				break;
+			}
 			switch( data & 7 )
 			{
 			case 0x03:

@@ -73,7 +73,8 @@
     TT05 - Fighter's Impact Ace
     TT07 - G-Darius
 
-  Beastorizer bootleg runs on a ray storm motherboard, but doesn't have fx1b sound h/w.
+  The Beastorizer bootleg (beastrzrb) runs as the COH-1002E games below, with
+  its own sound board (AT89C4051 + OKI M6295, internal ROM undumped).
 
   PS Arcade 95 ( coh-1002e )
   --------------------------
@@ -130,9 +131,15 @@ Sound: Analog Devices ADSP-2181
     MG05 - Dead or Alive ++
     MG09 - Tondemo Crisis
 
-  ***************************************************************************/
+  Atari / Time Warner ( coh-1000w )
+  ---------------------------------
 
-#define PROTECTION_HACK ( 1 )
+    Key
+    ---
+    TW01 - Motherboard
+    TW02 - Primal Rage II
+
+  ***************************************************************************/
 
 #include "driver.h"
 #include "vidhrdw/generic.h"
@@ -144,138 +151,12 @@ Sound: Analog Devices ADSP-2181
 #include "includes/psx.h"
 #include "state.h"
 #include "sound/psx.h"
+#include "machine/idectrl.h"
+#include "cpu/adsp2100/adsp2100.h"
 
 static int zn_bank_secsel;	/* the game ROM bank follows this register (Raizing) */
 static UINT32 tecmo_bank;
 static void tecmo_bank_update( void );
-
-#if PROTECTION_HACK
-
-
-/* decodetaito.c */
-static unsigned char tt_protection_hack[] =
-{
-	/* unknown */
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00,
-
-	/* first test, this byte is ignored */
-	0xef,
-
-	/* checked for explicitly ( skips red screen ) */
-	0xd7, 0x5f, 0xb7, 0xea, 0x51, 0x15, 0x96, 0x02,
-	0x0b, 0xf8, 0xf5, 0x54, 0xc5, 0xf9, 0x5d, 0x5d,
-	0xea, 0x13, 0xd0, 0x63, 0x95, 0xd4, 0x9f, 0xee,
-	0xeb, 0x3f, 0x94, 0x36, 0x42, 0x45, 0x81, 0xb0,
-	0x80, 0xc4, 0x3f, 0x42, 0x39, 0x2a, 0xa4, 0x28,
-	0x28, 0x20, 0xac, 0x00, 0x20, 0x8a, 0x28, 0x92,
-	0xa8,
-
-	/* unknown */
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-
-	/* second test, this byte is ignored */
-	0x00,
-
-	/* checks the result of a calculation ( skips blue screen ) */
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00,
-
-	/* default value */
-	0x00,
-};
-
-static unsigned short n_sio0_ptr;
-static unsigned char *p_sio0_ret;
-static unsigned short n_sio0_ret_size;
-
-#endif
-
-static READ32_HANDLER( sio0_r )
-{
-	unsigned short n_return;
-
-	n_return = 0;
-	switch( offset )
-	{
-	case 0x00:
-		/* data */
-#if PROTECTION_HACK
-		if( p_sio0_ret != NULL )
-		{
-			n_return = p_sio0_ret[ n_sio0_ptr ];
-			if( n_sio0_ptr < n_sio0_ret_size - 1 )
-			{
-				n_sio0_ptr++;
-			}
-		}
-#endif
-		break;
-	case 0x01:
-		/* status */
-#if PROTECTION_HACK
-		if( p_sio0_ret != NULL )
-		{
-			n_return = 2;
-		}
-#endif
-		break;
-	case 0x02:
-		/* mode */
-		break;
-	case 0x03:
-		/* control */
-		break;
-	case 0x04:
-		/* baud */
-		break;
-	}
-	log_cb(RETRO_LOG_DEBUG, LOGPRE  "%08x: sio0_r( %04x ) %04x\n", activecpu_get_pc(), offset, n_return );
-	return n_return;
-}
-
-static WRITE32_HANDLER( sio0_w )
-{
-	int n_char;
-	char s_char[ 5 ];
-
-	s_char[ 0 ] = 0;
-	switch( offset )
-	{
-	case 0x00:
-		/* data */
-		n_char = ( data & 0xff );
-		if( n_char >= 0x20 && n_char <= 0x7f )
-		{
-			sprintf( s_char, " '%c'", n_char );
-		}
-		else
-		{
-			sprintf( s_char, " $%02x", n_char );
-		}
-		break;
-	case 0x01:
-		/* status */
-		break;
-	case 0x02:
-		/* mode */
-		break;
-	case 0x03:
-		/* control */
-		break;
-	case 0x04:
-		/* baud */
-		break;
-	}
-	log_cb(RETRO_LOG_DEBUG, LOGPRE  "%08x: sio0_w( %04x, %08x )%s\n", activecpu_get_pc(), offset, data, s_char );
-}
 
 static UINT8 qsound_bank;
 
@@ -289,30 +170,6 @@ static WRITE_HANDLER( qsound_bankswitch_w )
 	qsound_bank = data & 0x0f;
 	qsound_bank_update();
 }
-
-static MEMORY_READ32_START( zn_readmem )
-	{ 0x00000000, 0x003fffff, MRA32_RAM },		/* ram */
-	{ 0x1f000000, 0x1f3fffff, MRA32_BANK1 },	/* game rom */
-	{ 0x1f800000, 0x1f8003ff, MRA32_BANK3 },	/* scratchpad */
-	{ 0x1f801040, 0x1f80104f, sio0_r },
-	{ 0x1f801810, 0x1f801817, psx_gpu_r },
-	{ 0x1fb80000, 0x1fbbffff, MRA32_BANK6 },	/* country rom */
-	{ 0x80000000, 0x803fffff, MRA32_BANK4 },	/* ram mirror */
-	{ 0xa0000000, 0xa03fffff, MRA32_BANK5 },	/* ram mirror */
-	{ 0xbfc00000, 0xbfc7ffff, MRA32_BANK7 },	/* bios */
-MEMORY_END
-
-static MEMORY_WRITE32_START( zn_writemem )
-	{ 0x00000000, 0x003fffff, MWA32_RAM },		/* ram */
-	{ 0x1f000000, 0x1f3fffff, MWA32_ROM },		/* game rom */
-	{ 0x1f800000, 0x1f8003ff, MWA32_BANK3 },	/* scratchpad */
-	{ 0x1f801040, 0x1f80104f, sio0_w },
-	{ 0x1f801810, 0x1f801817, psx_gpu_w },
-	{ 0x1fb80000, 0x1fbbffff, MWA32_ROM },		/* country rom */
-	{ 0x80000000, 0x803fffff, MWA32_BANK4 },	/* ram mirror */
-	{ 0xa0000000, 0xa03fffff, MWA32_BANK5 },	/* ram mirror */
-	{ 0xbfc00000, 0xbfc7ffff, MWA32_ROM },		/* bios */
-MEMORY_END
 
 static MEMORY_READ_START( qsound_readmem )
 	{ 0x0000, 0x7fff, MRA_ROM },
@@ -333,72 +190,6 @@ MEMORY_END
 static PORT_READ_START( qsound_readport )
 	{ 0x00, 0x00, soundlatch_r },
 PORT_END
-
-static DRIVER_INIT( zn )
-{
-	zn_bank_secsel = 0;
-	cpu_setbank( 1, memory_region( REGION_USER1 ) ); /* game rom */
-	cpu_setbank( 3, memory_region( REGION_CPU1 ) + 0x0480000 ); /* scratch pad */
-	cpu_setbank( 4, memory_region( REGION_CPU1 ) ); /* ram mirror */
-	cpu_setbank( 5, memory_region( REGION_CPU1 ) ); /* ram mirror */
-	cpu_setbank( 6, memory_region( REGION_USER2 ) ); /* capcom country rom */
-	cpu_setbank( 7, memory_region( REGION_CPU1 ) + 0x0400000 ); /* bios */
-
-#if PROTECTION_HACK
-	if( strcmp( Machine->gamedrv->name, "ftimpcta" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "gdarius" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "gdarius2" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "mgcldate" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "psyforce" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "raystorm" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "sfchamp" ) == 0 ||
-		strcmp( Machine->gamedrv->name, "beastrzb" ) == 0 )
-	{
-		p_sio0_ret = tt_protection_hack;
-		n_sio0_ret_size = sizeof( tt_protection_hack );
-	}
-	else
-	{
-		p_sio0_ret = NULL;
-		n_sio0_ret_size = 0;
-	}
-#endif
-	psx_driver_init();
-}
-
-static MACHINE_INIT( zn )
-{
-#if PROTECTION_HACK
-	n_sio0_ptr = 0;
-#endif
-	psx_machine_init();
-}
-
-static MACHINE_DRIVER_START( zn )
-	/* basic machine hardware */
-	MDRV_CPU_ADD(PSXCPU, 33868800) /* 33MHz ?? */
-	MDRV_CPU_MEMORY(zn_readmem,zn_writemem)
-	MDRV_CPU_VBLANK_INT(psx_vblank,1)
-
-	MDRV_FRAMES_PER_SECOND(60)
-	MDRV_VBLANK_DURATION(0)
-
-	MDRV_MACHINE_INIT(zn)
-
-	/* video hardware */
-	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER)
-	MDRV_SCREEN_SIZE(640, 480)
-	MDRV_VISIBLE_AREA(0, 479, 0, 479)
-	MDRV_PALETTE_LENGTH(65536)
-
-	MDRV_PALETTE_INIT(psx)
-	MDRV_VIDEO_START(psx_type2_1024x1024)
-	MDRV_VIDEO_UPDATE(psx)
-	MDRV_VIDEO_STOP(psx)
-
-	/* sound hardware */
-	MDRV_SOUND_ATTRIBUTES(SOUND_SUPPORTS_STEREO)
-MACHINE_DRIVER_END
 
 /***************************************************************************
 
@@ -795,7 +586,10 @@ static READ32_HANDLER( boardconfig_r )
 {
 	/* --00/01 mem=4M, 10 mem=8M, 11 mem=16M; -1-- smem=2M; 1--- vmem=2M;
 	   011----- rev=1 */
-	return zn_vram_2mb ? 64|32|8 : 64|32;
+	int n_config = zn_vram_2mb ? 64|32|8 : 64|32;
+	if( memory_region_length( REGION_CPU1 ) == 0x800000 )
+		n_config |= 2;	/* 8MB (Atari) */
+	return n_config;
 }
 
 static READ32_HANDLER( zn_unknown_r )
@@ -803,9 +597,15 @@ static READ32_HANDLER( zn_unknown_r )
 	return 0xffffffff;
 }
 
+static int zn_gun_mux = -1;	/* Acclaim light guns: which gun the GPU holds, on SERVICE bit 3 */
+
 static READ32_HANDLER( zn_inputs_r )	/* P1, P2, SERVICE, SYSTEM at 0x1fa00000 + 0x100 each */
 {
-	return readinputport( ( offset >> 6 ) & 3 ) | 0xffffff00;
+	int n_port = ( offset >> 6 ) & 3;
+	UINT32 n_data = readinputport( n_port ) | 0xffffff00;
+	if( n_port == 2 && zn_gun_mux >= 0 )
+		n_data = ( n_data & ~8 ) | ( zn_gun_mux ? 8 : 0 );
+	return n_data;
 }
 
 static READ32_HANDLER( zn_inputs2_r )	/* P3, P4 at 0x1fa10000 + 0x100 each */
@@ -940,8 +740,9 @@ static data32_t *zn_scratchpad;
 
 /* direct access to RAM, scratchpad and BIOS for the PSX CPU core, and the
    recompiler (core option, as on System 11/12). Called at machine init,
-   after the cpu init that clears them. The RAM is 4 MB here, the
-   BIOS is in REGION_USER3, so psx_machine_cpu_speedups() does not fit */
+   after the cpu init that clears them. The RAM is 4 MB (8 MB on the
+   Atari board), the BIOS is in REGION_USER3, so psx_machine_cpu_speedups()
+   does not fit */
 static void zn_cpu_speedups( void )
 {
 	static const offs_t ram_base[] = { 0x00000000, 0x80000000, 0xa0000000 };
@@ -950,7 +751,7 @@ static void zn_cpu_speedups( void )
 	UINT32 n_bios = memory_region_length( REGION_USER3 );
 	int i;
 
-	if( n_ram > 0x00400000 ) n_ram = 0x00400000;
+	if( n_ram > 0x00800000 ) n_ram = 0x00800000;
 	for( i = 0; i < 3; i++ )
 	{
 		psxcpu_add_fastram( ram_base[ i ], ram_base[ i ] + n_ram - 1, 0, memory_region( REGION_CPU1 ) );
@@ -1013,6 +814,7 @@ static void zn_board_init( void )
 
 static void zn_board_reset( void )
 {
+	zn_gun_mux = -1;
 	m_n_znsecsel = 0;
 	m_n_dip_bit = 0;
 	m_b_lastclock = 1;
@@ -1926,7 +1728,7 @@ static MACHINE_DRIVER_START( coh1002e )
 	MDRV_CPU_MEMORY( raizing_zn_readmem, raizing_zn_writemem )
 	MDRV_CPU_VBLANK_INT( psx_vblank, 1 )
 
-	MDRV_CPU_ADD( M68000, 12000000 )
+	MDRV_CPU_ADD_TAG( "raizing_sound", M68000, 12000000 )
 	MDRV_CPU_FLAGS( CPU_AUDIO_CPU )
 	MDRV_CPU_MEMORY( raizing_sound_readmem, raizing_sound_writemem )
 
@@ -1949,7 +1751,1061 @@ static MACHINE_DRIVER_START( coh1002e )
 
 	MDRV_SOUND_ATTRIBUTES( SOUND_SUPPORTS_STEREO )
 	MDRV_SOUND_ADD( PSXSPU, zn_spu_interface )
-	MDRV_SOUND_ADD( YMF271, raizing_ymf271_interface )
+	MDRV_SOUND_ADD_TAG( "raizing_ymf", YMF271, raizing_ymf271_interface )
+MACHINE_DRIVER_END
+
+/* Beastorizer bootleg, as MAME beastrzrb_state: the COH-1002E board
+   without its sound board. The bootleg sound board (an AT89C4051 with an
+   OKI M6295) has an undumped internal ROM, so the commands sent to it at
+   0x1fb00000 go nowhere and the game has no sound, as in MAME. */
+static MEMORY_WRITE32_START( beastrzrb_writemem )
+	ZN_MAIN_WRITE
+	{ 0x1f000000, 0x1f7fffff, MWA32_ROM },
+	{ 0x1fb00000, 0x1fb00007, MWA32_NOP },
+MEMORY_END
+
+static MACHINE_DRIVER_START( beastrzrb )
+	MDRV_IMPORT_FROM( coh1002e )
+	MDRV_CPU_MODIFY( "main" )
+	MDRV_CPU_MEMORY( raizing_zn_readmem, beastrzrb_writemem )
+	MDRV_CPU_REMOVE( "raizing_sound" )
+	MDRV_SOUND_REMOVE( "raizing_ymf" )
+MACHINE_DRIVER_END
+
+
+/***************************************************************************
+
+  Atari / Time Warner (COH-1000W), as in current MAME
+
+  ZN-1 main board with 2MB VRAM, 8MB of RAM and the Time Warner BIOS;
+  CAT702 TW01 on the main board, TW02 on the ROM board. Game ROM: 2MB at
+  0x1f000000. A VT83C461 IDE controller with the hard disk: its registers
+  at 0x1f7e4000, a 32-bit data port at 0x1f7f4000 (the high half is
+  latched), an interrupt enable at 0x1f7e8000 (bit 0), the interrupt on
+  PSX IRQ 10 and the sector data on PSX DMA channel 5. Sound: the PSX SPU
+  only.
+
+***************************************************************************/
+
+static UINT16 atari_irqctrl;
+static UINT16 atari_latch;
+static UINT8 atari_ide_irq;
+
+static void atari_ide_interrupt( int state )
+{
+	atari_ide_irq = ( state != CLEAR_LINE );
+	if( atari_ide_irq && ( atari_irqctrl & 1 ) )
+		psx_irq_set( 0x400 );
+}
+
+static struct ide_interface atari_ide_intf =
+{
+	atari_ide_interrupt
+};
+
+static READ32_HANDLER( atari_irqctrl_r )
+{
+	return atari_irqctrl;
+}
+
+static WRITE32_HANDLER( atari_irqctrl_w )
+{
+	UINT32 n_ctrl = atari_irqctrl;
+	COMBINE_DATA( &n_ctrl );
+	atari_irqctrl = n_ctrl & 0xffff;
+}
+
+/* the 32-bit data port: a read of 0x1f0 returns the low half and latches
+   the high half, which a read of 0x1f2 returns */
+static READ32_HANDLER( atari_ide32_r )
+{
+	UINT32 n_data = 0xffffffff;
+	if( offset == 0x1f0 / 4 )
+	{
+		if( ( mem_mask & 0x0000ffff ) == 0 )
+		{
+			UINT32 n_data32 = ide_controller32_0_r( 0x1f0 / 4, 0 );
+			atari_latch = n_data32 >> 16;
+			n_data = ( n_data & 0xffff0000 ) | ( n_data32 & 0xffff );
+		}
+		if( ( mem_mask & 0xffff0000 ) == 0 )
+			n_data = ( n_data & 0x0000ffff ) | ( (UINT32)atari_latch << 16 );
+	}
+	return n_data;
+}
+
+/* the sector data on DMA channel 5, 16 bits at a time */
+static void atari_dma_read( UINT32 n_address, INT32 n_size )
+{
+	UINT8 *p_ram = memory_region( REGION_CPU1 );
+	UINT32 n_mask = memory_region_length( REGION_CPU1 ) - 1;
+
+	n_size <<= 1;
+	while( n_size > 0 )
+	{
+		UINT16 n_word = ide_controller32_0_r( 0x1f0 / 4, 0xffff0000 ) & 0xffff;
+		*( (UINT16 *)( p_ram + WORD_XOR_LE( n_address & n_mask ) ) ) = n_word;
+		n_address += 2;
+		n_size--;
+	}
+}
+
+static void atari_dma_write( UINT32 n_address, INT32 n_size )
+{
+}
+
+static MEMORY_READ32_START( atari_zn_readmem )
+	{ 0x00000000, 0x007fffff, MRA32_RAM },    /* ram, 8MB */
+	{ 0x80000000, 0x807fffff, MRA32_BANK5 },  /* ram mirror */
+	{ 0xa0000000, 0xa07fffff, MRA32_BANK9 },  /* ram mirror */
+	{ 0x1f000000, 0x1f1fffff, MRA32_BANK1 },  /* game rom */
+	{ 0x1f7e4000, 0x1f7e4fff, ide_controller32_0_r },
+	{ 0x1f7e8000, 0x1f7e8003, atari_irqctrl_r },
+	{ 0x1f7f4000, 0x1f7f4fff, atari_ide32_r },
+	ZN_MAIN_READ
+MEMORY_END
+
+static MEMORY_WRITE32_START( atari_zn_writemem )
+	{ 0x00000000, 0x007fffff, MWA32_RAM },
+	{ 0x80000000, 0x807fffff, MWA32_BANK5 },
+	{ 0xa0000000, 0xa07fffff, MWA32_BANK9 },
+	{ 0x1f000000, 0x1f000003, MWA32_NOP },    /* watchdog (DS1232) */
+	{ 0x1f000004, 0x1f1fffff, MWA32_ROM },
+	{ 0x1f7e4000, 0x1f7e4fff, ide_controller32_0_w },
+	{ 0x1f7e8000, 0x1f7e8003, atari_irqctrl_w },
+	{ 0x1f7f4000, 0x1f7f4fff, MWA32_NOP },
+	ZN_MAIN_WRITE
+MEMORY_END
+
+static DRIVER_INIT( coh1000w )
+{
+	zn_scratchpad = auto_malloc( 0x400 );
+	zn_eeprom = auto_malloc( 0x800 );
+	memset( zn_scratchpad, 0, 0x400 );
+	memset( zn_eeprom, 0xff, 0x800 );
+
+	zn_vram_2mb = 1;
+	zn_coin_tecmo = 0;
+	zn_eeprom_default = REGION_USER6;	/* factory settings */
+
+	zn_board_init();
+	cpu_setbank( 1, memory_region( REGION_USER1 ) );
+	znsec_init( 0, memory_region( REGION_USER4 ) );	/* TW01 */
+	znsec_init( 1, memory_region( REGION_USER5 ) );	/* TW02 */
+
+	psx_dma_install_read_handler( 5, atari_dma_read );
+	psx_dma_install_write_handler( 5, atari_dma_write );
+	ide_controller_init( 0, &atari_ide_intf );
+
+	state_save_register_UINT16( "zn", 0, "atari_irqctrl", &atari_irqctrl, 1 );
+	state_save_register_UINT16( "zn", 0, "atari_latch", &atari_latch, 1 );
+	state_save_register_UINT8( "zn", 0, "atari_ide_irq", &atari_ide_irq, 1 );
+	state_save_register_UINT32( "zn", 0, "scratchpad", zn_scratchpad, 0x100 );
+}
+
+static MACHINE_INIT( atari_zn )
+{
+	atari_irqctrl = 0;
+	atari_latch = 0;
+	atari_ide_irq = 0;
+	ide_controller_reset( 0 );
+	zn_board_reset();
+}
+
+/* ZN-1, 2MB VRAM, 8MB RAM (COH-1000W), SPU sound */
+static MACHINE_DRIVER_START( coh1000w )
+	MDRV_CPU_ADD_TAG( "main", PSXCPU, 33868800 / 2 )	/* CXD8530CQ, 67.7376MHz XTAL; as System 11 */
+	MDRV_CPU_MEMORY( atari_zn_readmem, atari_zn_writemem )
+	MDRV_CPU_VBLANK_INT( psx_vblank, 1 )
+
+	MDRV_FRAMES_PER_SECOND( 60 )
+	MDRV_VBLANK_DURATION( 0 )
+
+	MDRV_MACHINE_INIT( atari_zn )
+	MDRV_NVRAM_HANDLER( zn )
+
+	MDRV_VIDEO_ATTRIBUTES( VIDEO_TYPE_RASTER | VIDEO_RGB_DIRECT )
+	MDRV_SCREEN_SIZE( 640, 480 )
+	MDRV_VISIBLE_AREA( 0, 639, 0, 479 )
+	MDRV_PALETTE_LENGTH( 65536 )
+
+	MDRV_PALETTE_INIT( psx )
+	MDRV_VIDEO_START( psx_type2_1024x1024 )
+	MDRV_VIDEO_UPDATE( psx )
+	MDRV_VIDEO_STOP( psx )
+
+	MDRV_SOUND_ATTRIBUTES( SOUND_SUPPORTS_STEREO )
+	MDRV_SOUND_ADD( PSXSPU, zn_spu_interface )
+MACHINE_DRIVER_END
+
+
+/***************************************************************************
+
+  Acclaim (COH-1000A): Judge Dredd, as in current MAME
+
+  ZN-1 main board with 2MB VRAM and the Acclaim BIOS; CAT702 AC01 on the
+  main board, AC02 on the ROM board. Game ROM: 2MB at 0x1f000000. An IDE
+  hard disk: the command block at 0x1fbfff90, the control block at
+  0x1fbfff80, 16 bits per register; its interrupt on PSX IRQ 10. Two light
+  guns: at each vblank the board switches gun (SERVICE bit 3) and the GPU
+  latches its coordinates. Sound: the PSX SPU only.
+
+***************************************************************************/
+
+static UINT8 acclaim_gun_mux;
+
+static void acclaim_ide_interrupt( int state )
+{
+	if( state != CLEAR_LINE )
+		psx_irq_set( 0x400 );
+}
+
+static struct ide_interface acclaim_ide_intf =
+{
+	acclaim_ide_interrupt
+};
+
+/* the IDE registers of a block (0x1f0 or 0x3f0), one per 16-bit word */
+static UINT32 acclaim_ide_read( int n_base, offs_t offset, UINT32 mem_mask )
+{
+	UINT32 n_data = 0;
+	int n_half;
+	for( n_half = 0; n_half < 2; n_half++ )
+	{
+		UINT32 n_halfmask = 0xffff << ( n_half * 16 );
+		if( ( mem_mask & n_halfmask ) != n_halfmask )
+		{
+			int n_reg = n_base + offset * 2 + n_half;
+			int n_lane = n_reg & 3;
+			UINT32 n_mask = ( n_reg == 0x1f0 ) ? 0xffff0000 : ~( 0xff << ( n_lane * 8 ) );
+			UINT32 n_value = ide_controller32_0_r( n_reg / 4, n_mask ) >> ( n_lane * 8 );
+			n_value &= ( n_reg == 0x1f0 ) ? 0xffff : 0xff;
+			n_data |= n_value << ( n_half * 16 );
+		}
+	}
+	return n_data;
+}
+
+static void acclaim_ide_write( int n_base, offs_t offset, UINT32 data, UINT32 mem_mask )
+{
+	int n_half;
+	for( n_half = 0; n_half < 2; n_half++ )
+	{
+		UINT32 n_halfmask = 0xffff << ( n_half * 16 );
+		if( ( mem_mask & n_halfmask ) != n_halfmask )
+		{
+			int n_reg = n_base + offset * 2 + n_half;
+			int n_lane = n_reg & 3;
+			UINT32 n_value = ( data >> ( n_half * 16 ) ) & ( ( n_reg == 0x1f0 ) ? 0xffff : 0xff );
+			UINT32 n_mask = ( n_reg == 0x1f0 ) ? 0xffff0000 : ~( 0xff << ( n_lane * 8 ) );
+			ide_controller32_0_w( n_reg / 4, n_value << ( n_lane * 8 ), n_mask );
+		}
+	}
+}
+
+static READ32_HANDLER( acclaim_ide_cs0_r ) { return acclaim_ide_read( 0x1f0, offset, mem_mask ); }
+static WRITE32_HANDLER( acclaim_ide_cs0_w ) { acclaim_ide_write( 0x1f0, offset, data, mem_mask ); }
+static READ32_HANDLER( acclaim_ide_cs1_r ) { return acclaim_ide_read( 0x3f0, offset, mem_mask ); }
+static WRITE32_HANDLER( acclaim_ide_cs1_w ) { acclaim_ide_write( 0x3f0, offset, data, mem_mask ); }
+
+static MEMORY_READ32_START( jdredd_readmem )
+	ZN_MAIN_READ
+	{ 0x1f000000, 0x1f1fffff, MRA32_BANK1 },  /* game rom */
+	{ 0x1fbfff80, 0x1fbfff8f, acclaim_ide_cs1_r },
+	{ 0x1fbfff90, 0x1fbfff9f, acclaim_ide_cs0_r },
+MEMORY_END
+
+static MEMORY_WRITE32_START( jdredd_writemem )
+	ZN_MAIN_WRITE
+	{ 0x1f000000, 0x1f1fffff, MWA32_ROM },
+	{ 0x1fbfff00, 0x1fbfff03, MWA32_NOP },    /* bank (no effect) */
+	{ 0x1fbfff10, 0x1fbfff13, MWA32_NOP },
+	{ 0x1fbfff80, 0x1fbfff8f, acclaim_ide_cs1_w },
+	{ 0x1fbfff90, 0x1fbfff9f, acclaim_ide_cs0_w },
+MEMORY_END
+
+/* at each vblank: the other gun, and its coordinates to the GPU when it
+   points at the screen */
+static INTERRUPT_GEN( jdredd_vblank )
+{
+	int n_x, n_y;
+
+	acclaim_gun_mux = !acclaim_gun_mux;
+	zn_gun_mux = acclaim_gun_mux;
+	n_x = readinputport( 7 + acclaim_gun_mux * 2 );
+	n_y = readinputport( 8 + acclaim_gun_mux * 2 );
+	if( n_x > 0x393 && n_x < 0xcb2 && n_y > 0x02d && n_y < 0x217 )
+		psx_gpu_lightgun_set( n_x, n_y );
+	psx_vblank();
+}
+
+/* the crosshairs: the gun ports span the whole screen, as
+   PORT_CROSSHAIR( X/Y, 1.0, 0.0, 0 ) in MAME */
+static VIDEO_UPDATE( jdredd )
+{
+	const struct rectangle *visible = &Machine->visible_area;
+	int n_gun;
+
+	video_update_psx( bitmap, cliprect );
+
+	for( n_gun = 0; n_gun < 2; n_gun++ )
+	{
+		int n_x = readinputport( 7 + n_gun * 2 ) - 0x392;
+		int n_y = readinputport( 8 + n_gun * 2 ) - 0x02c;
+		n_x = visible->min_x + n_x * ( visible->max_x - visible->min_x ) / ( 0xcb3 - 0x392 );
+		n_y = visible->min_y + n_y * ( visible->max_y - visible->min_y ) / ( 0x218 - 0x02c );
+		draw_crosshair( n_gun + 1, bitmap, n_x, n_y, cliprect );
+	}
+}
+
+static void jdredd_postload( void )
+{
+	zn_gun_mux = acclaim_gun_mux;
+}
+
+static DRIVER_INIT( jdredd )
+{
+	zn_scratchpad = auto_malloc( 0x400 );
+	zn_eeprom = auto_malloc( 0x800 );
+	memset( zn_scratchpad, 0, 0x400 );
+	memset( zn_eeprom, 0xff, 0x800 );
+
+	zn_vram_2mb = 1;
+	zn_coin_tecmo = 0;
+	zn_eeprom_default = 0;
+
+	zn_board_init();
+	cpu_setbank( 1, memory_region( REGION_USER1 ) );
+	znsec_init( 0, memory_region( REGION_USER4 ) );	/* AC01 */
+	znsec_init( 1, memory_region( REGION_USER5 ) );	/* AC02 */
+
+	ide_controller_init( 0, &acclaim_ide_intf );
+
+	state_save_register_UINT8( "zn", 0, "acclaim_gun_mux", &acclaim_gun_mux, 1 );
+	state_save_register_UINT32( "zn", 0, "scratchpad", zn_scratchpad, 0x100 );
+	state_save_register_func_postload( jdredd_postload );
+}
+
+static MACHINE_INIT( jdredd )
+{
+	ide_controller_reset( 0 );
+	zn_board_reset();
+	acclaim_gun_mux = 0;
+	zn_gun_mux = 0;
+}
+
+/* ZN-1, 2MB VRAM (COH-1000A), hard disk, SPU sound */
+static MACHINE_DRIVER_START( jdredd )
+	MDRV_CPU_ADD_TAG( "main", PSXCPU, 33868800 / 2 )	/* CXD8530CQ, 67.7376MHz XTAL; as System 11 */
+	MDRV_CPU_MEMORY( jdredd_readmem, jdredd_writemem )
+	MDRV_CPU_VBLANK_INT( jdredd_vblank, 1 )
+
+	MDRV_FRAMES_PER_SECOND( 60 )
+	MDRV_VBLANK_DURATION( 0 )
+
+	MDRV_MACHINE_INIT( jdredd )
+	MDRV_NVRAM_HANDLER( zn )
+
+	MDRV_VIDEO_ATTRIBUTES( VIDEO_TYPE_RASTER | VIDEO_RGB_DIRECT )
+	MDRV_SCREEN_SIZE( 640, 480 )
+	MDRV_VISIBLE_AREA( 0, 639, 0, 479 )
+	MDRV_PALETTE_LENGTH( 65536 )
+
+	MDRV_PALETTE_INIT( psx )
+	MDRV_VIDEO_START( psx_type2_1024x1024 )
+	MDRV_VIDEO_UPDATE( jdredd )
+	MDRV_VIDEO_STOP( psx )
+
+	MDRV_SOUND_ATTRIBUTES( SOUND_SUPPORTS_STEREO )
+	MDRV_SOUND_ADD( PSXSPU, zn_spu_interface )
+MACHINE_DRIVER_END
+
+
+/***************************************************************************
+
+  Acclaim (COH-1000A): NBA Jam Extreme, as in current MAME
+
+  The Acclaim ZN-1 board of Judge Dredd, without the hard disk: 32MB of
+  game ROM in 16 banks of 2MB and 32KB of battery backed RAM (71256), and
+  the RAX sound board.
+
+  Game ROM at 0x1f000000: the first 2MB window holds the bank written in
+  the low half of 0x1fbfff00. When that byte is 0, the backup RAM is at
+  0x1f200000 (8 bits per byte address); otherwise the 6MB from 0x1f200000
+  read the ROM from the bank written in the high half (inverted bit 4),
+  and the backup RAM is still written there.
+
+  RAX sound board (MAME shared/rax.cpp): an ADSP-2181 at 16.67MHz with
+  8MB of ROM (two banks of 4MB) read by its byte DMA (BDMA), 4 banks of
+  8K words of external data RAM behind the data memory overlay, and two
+  DACs fed by SPORT0 in autobuffer mode. The main CPU writes 16-bit
+  commands to 0x1fbfff80; the ADSP reads them at I/O 3, which clears its
+  IRQL0.
+
+***************************************************************************/
+
+/* the ADSP-2181 control registers, data memory 0x3fe0-0x3fff */
+enum
+{
+	RAX_IDMA_CONTROL_REG = 0,	/* 3fe0 */
+	RAX_BDMA_INT_ADDR_REG,		/* 3fe1 */
+	RAX_BDMA_EXT_ADDR_REG,		/* 3fe2 */
+	RAX_BDMA_CONTROL_REG,		/* 3fe3 */
+	RAX_BDMA_WORD_COUNT_REG,	/* 3fe4 */
+	RAX_PROG_FLAG_DATA_REG,		/* 3fe5 */
+	RAX_PROG_FLAG_CONTROL_REG,	/* 3fe6 */
+
+	RAX_S1_AUTOBUF_REG = 15,	/* 3fef */
+	RAX_S1_RFSDIV_REG,			/* 3ff0 */
+	RAX_S1_SCLKDIV_REG,			/* 3ff1 */
+	RAX_S1_CONTROL_REG,			/* 3ff2 */
+	RAX_S0_AUTOBUF_REG,			/* 3ff3 */
+	RAX_S0_RFSDIV_REG,			/* 3ff4 */
+	RAX_S0_SCLKDIV_REG,			/* 3ff5 */
+	RAX_S0_CONTROL_REG,			/* 3ff6 */
+	RAX_S0_MCTXLO_REG,			/* 3ff7 */
+	RAX_S0_MCTXHI_REG,			/* 3ff8 */
+	RAX_S0_MCRXLO_REG,			/* 3ff9 */
+	RAX_S0_MCRXHI_REG,			/* 3ffa */
+	RAX_TIMER_SCALE_REG,		/* 3ffb */
+	RAX_TIMER_COUNT_REG,		/* 3ffc */
+	RAX_TIMER_PERIOD_REG,		/* 3ffd */
+	RAX_WAITSTATES_REG,			/* 3ffe */
+	RAX_SYSCONTROL_REG			/* 3fff */
+};
+
+#define RAX_CLOCK			16670000
+#define RAX_BUFFER_SIZE		0x4000		/* DAC samples per channel */
+#define RAX_BUFFER_MASK		( RAX_BUFFER_SIZE - 1 )
+
+static int rax_cpunum;
+static UINT8 *rax_rom;
+static UINT16 *rax_banked_ram;			/* 5 x 8K words: internal, then external 0-3 */
+static UINT16 rax_control_regs[ 32 ];
+static UINT16 rax_data_in;
+static UINT16 rax_data_out;
+static UINT8 rax_pf0;
+static UINT16 rax_data_bank;
+static UINT16 rax_rom_bank;
+static UINT32 rax_dmovlay;
+static UINT16 rax_size;
+static UINT16 rax_incs;
+static INT32 rax_ireg;
+static UINT16 rax_ireg_base;
+static UINT8 rax_dac_enabled[ 2 ];
+
+/* the timers are not saved by the core: their time left is */
+static void *rax_reg_timer;
+static void *rax_dma_timer;
+static double rax_reg_timer_period;
+static double rax_reg_timer_left;
+static double rax_dma_timer_left;
+static UINT32 rax_dma_param;
+
+/* the DACs */
+static int rax_stream;
+static INT16 *rax_buffer[ 2 ];
+static UINT32 rax_buffer_in[ 2 ];
+static UINT32 rax_buffer_out[ 2 ];
+static UINT32 rax_sample_rate;
+static UINT32 rax_sample_step;
+static UINT32 rax_sample_position;
+
+static void rax_update_data_ram_bank( void )
+{
+	int n_entry = ( rax_dmovlay == 0 ) ? 0 : 1 + rax_data_bank;
+	cpu_setbank( 14, rax_banked_ram + n_entry * 0x2000 );
+}
+
+/* data memory as the ADSP sees it, outside its context (DMA, DACs) */
+static UINT16 *rax_data_ptr( UINT32 n_addr )
+{
+	n_addr &= 0x3fff;
+	if( n_addr < 0x2000 )
+		return rax_banked_ram + ( ( rax_dmovlay == 0 ) ? 0 : 1 + rax_data_bank ) * 0x2000 + n_addr;
+	if( n_addr < 0x3fe0 )
+		return (UINT16 *)( memory_region( REGION_CPU1 + rax_cpunum ) + ADSP2181_DATA_OFFSET + ( n_addr << 1 ) );
+	return NULL;
+}
+
+static void rax_dma_done( int param )
+{
+	/* update the external address and the page */
+	rax_control_regs[ RAX_BDMA_WORD_COUNT_REG ] = 0;
+	rax_control_regs[ RAX_BDMA_EXT_ADDR_REG ] = param & 0x3fff;
+	rax_control_regs[ RAX_BDMA_CONTROL_REG ] &= ~0xff00;
+	rax_control_regs[ RAX_BDMA_CONTROL_REG ] |= ( ( param >> 14 ) & 0xff ) << 8;
+
+	if( rax_control_regs[ RAX_BDMA_CONTROL_REG ] & 8 )
+		cpu_set_reset_line( rax_cpunum, PULSE_LINE );
+	else
+		cpu_set_irq_line( rax_cpunum, ADSP2181_BDMA, PULSE_LINE );
+
+	timer_adjust( rax_dma_timer, TIME_NEVER, 0, 0 );
+}
+
+/* the byte DMA: from the ROM to program or data memory, at once; the end
+   (its interrupt, or the reset of a boot load) after a cycle per word */
+static void rax_bdma( UINT32 n_count_reg )
+{
+	const UINT8 *adsp_rom = rax_rom + ( rax_rom_bank & 1 ) * 0x400000;
+	UINT32 page = ( rax_control_regs[ RAX_BDMA_CONTROL_REG ] >> 8 ) & 0xff;
+	UINT32 dir = ( rax_control_regs[ RAX_BDMA_CONTROL_REG ] >> 2 ) & 1;
+	UINT32 type = rax_control_regs[ RAX_BDMA_CONTROL_REG ] & 3;
+	UINT32 src_addr = ( page << 14 ) | rax_control_regs[ RAX_BDMA_EXT_ADDR_REG ];
+	UINT32 count = rax_control_regs[ RAX_BDMA_WORD_COUNT_REG ];
+
+	if( !dir )
+	{
+		while( count )
+		{
+			UINT32 n_addr = rax_control_regs[ RAX_BDMA_INT_ADDR_REG ];
+			if( type == 0 )
+			{
+				/* 24-bit words to program memory */
+				UINT32 n_word = ( adsp_rom[ ( src_addr + 0 ) & 0x3fffff ] << 16 ) |
+					( adsp_rom[ ( src_addr + 1 ) & 0x3fffff ] << 8 ) | adsp_rom[ ( src_addr + 2 ) & 0x3fffff ];
+				UINT32 *pgm = (UINT32 *)( memory_region( REGION_CPU1 + rax_cpunum ) + ADSP2181_PGM_OFFSET );
+				pgm[ n_addr & 0x3fff ] = n_word;
+				src_addr += 3;
+			}
+			else
+			{
+				/* 16-bit words, or bytes (MSB or LSB aligned) to data memory */
+				UINT16 n_word;
+				UINT16 *p;
+				if( type == 1 )
+				{
+					n_word = ( adsp_rom[ src_addr & 0x3fffff ] << 8 ) | adsp_rom[ ( src_addr + 1 ) & 0x3fffff ];
+					src_addr += 2;
+				}
+				else
+				{
+					n_word = adsp_rom[ src_addr & 0x3fffff ] << ( ( type == 2 ) ? 8 : 0 );
+					src_addr++;
+				}
+				p = rax_data_ptr( n_addr );
+				if( p )
+					*p = n_word;
+			}
+			rax_control_regs[ RAX_BDMA_INT_ADDR_REG ] = ( n_addr + 1 ) & 0x3fff;
+			count--;
+		}
+	}
+
+	rax_dma_param = src_addr;
+	timer_adjust( rax_dma_timer, TIME_IN_HZ( RAX_CLOCK ) * ( n_count_reg & 0x3fff ), rax_dma_param, 0 );
+}
+
+static READ16_HANDLER( rax_control_r )
+{
+	if( offset == RAX_PROG_FLAG_DATA_REG )
+		return rax_pf0;
+	return rax_control_regs[ offset ];
+}
+
+static WRITE16_HANDLER( rax_control_w )
+{
+	rax_control_regs[ offset ] = data;
+
+	switch( offset )
+	{
+		case RAX_BDMA_INT_ADDR_REG:
+			rax_control_regs[ offset ] = data & 0x3fff;
+			break;
+		case RAX_BDMA_EXT_ADDR_REG:
+			rax_control_regs[ offset ] = data & 0x3fff;
+			break;
+		case RAX_BDMA_CONTROL_REG:
+			rax_control_regs[ offset ] = data & 0xff0f;
+			break;
+		case RAX_BDMA_WORD_COUNT_REG:
+			rax_control_regs[ offset ] = data & 0x3fff;
+			rax_bdma( data );
+			break;
+
+		case RAX_S1_AUTOBUF_REG:
+			/* autobuffer off: the right DAC stops */
+			if( !( data & 2 ) )
+			{
+				stream_update( rax_stream, 0 );
+				rax_dac_enabled[ 1 ] = 0;
+				rax_buffer_in[ 1 ] = rax_buffer_out[ 1 ] = 0;
+			}
+			break;
+
+		case RAX_S0_AUTOBUF_REG:
+			/* autobuffer off: the left DAC and the transfers stop */
+			if( !( data & 2 ) )
+			{
+				stream_update( rax_stream, 0 );
+				rax_dac_enabled[ 0 ] = 0;
+				rax_buffer_in[ 0 ] = rax_buffer_out[ 0 ] = 0;
+				timer_adjust( rax_reg_timer, TIME_NEVER, 0, 0 );
+				rax_reg_timer_period = 0;
+			}
+			break;
+	}
+}
+
+/* the I/O space: data RAM bank, ROM bank, and the latches */
+static UINT16 rax_io_r( UINT32 offset )
+{
+	if( offset == 3 )
+	{
+		cpu_set_irq_line( rax_cpunum, ADSP2181_IRQL0, CLEAR_LINE );
+		return rax_data_in;
+	}
+	return 0xffff;
+}
+
+static void rax_io_w( UINT32 offset, UINT16 data )
+{
+	switch( offset )
+	{
+		case 0:
+			/* the board has two more RAM sockets, empty */
+			rax_data_bank = data & 3;
+			rax_update_data_ram_bank();
+			break;
+		case 1:
+			rax_rom_bank = data;
+			break;
+		case 3:
+			rax_data_out = data;
+			rax_pf0 = 0;
+			break;
+	}
+}
+
+static void rax_dmovlay_w( UINT32 data )
+{
+	rax_dmovlay = ( data != 0 );
+	rax_update_data_ram_bank();
+}
+
+/* a quarter of the autobuffer, to the DACs (left, right interleaved) */
+static void rax_irq( int param )
+{
+	int reg = cpunum_get_reg( rax_cpunum, ADSP2100_I0 + rax_ireg );
+	int count = rax_size / ( 4 * ( rax_incs ? rax_incs : 1 ) );
+	int i;
+
+	stream_update( rax_stream, 0 );
+
+	for( i = 0; i < ( count & ~1 ); i++ )
+	{
+		UINT16 *p = rax_data_ptr( reg );
+		int n_channel = i & 1;
+		if( rax_dac_enabled[ n_channel ] )
+		{
+			rax_buffer[ n_channel ][ rax_buffer_in[ n_channel ] & RAX_BUFFER_MASK ] = p ? (INT16)*p : 0;
+			if( rax_buffer_in[ n_channel ] - rax_buffer_out[ n_channel ] < RAX_BUFFER_SIZE - 1 )
+				rax_buffer_in[ n_channel ]++;
+		}
+		reg += rax_incs;
+	}
+
+	/* check for wrapping */
+	if( reg >= rax_ireg_base + rax_size )
+		reg = rax_ireg_base;
+
+	cpunum_set_reg( rax_cpunum, ADSP2100_I0 + rax_ireg, reg );
+}
+
+/* SPORT0 transmit: the autobuffer starts */
+static void rax_tx_callback( int port, INT32 data )
+{
+	if( port != 0 )
+		return;
+
+	/* SPORT0 enabled */
+	if( rax_control_regs[ RAX_SYSCONTROL_REG ] & 0x1000 )
+	{
+		/* autobuffer only, which is what this board uses */
+		if( rax_control_regs[ RAX_S0_AUTOBUF_REG ] & 0x0002 )
+		{
+			int mreg, lreg;
+			UINT16 source;
+
+			stream_update( rax_stream, 0 );
+
+			rax_ireg = ( rax_control_regs[ RAX_S0_AUTOBUF_REG ] >> 9 ) & 7;
+			mreg = ( rax_control_regs[ RAX_S0_AUTOBUF_REG ] >> 7 ) & 3;
+			mreg |= rax_ireg & 0x04;	/* msb comes from ireg */
+			lreg = rax_ireg;
+
+			source = cpunum_get_reg( rax_cpunum, ADSP2100_I0 + rax_ireg );
+			rax_incs = cpunum_get_reg( rax_cpunum, ADSP2100_M0 + mreg );
+			rax_size = cpunum_get_reg( rax_cpunum, ADSP2100_L0 + lreg );
+
+			/* the base value, kept for the wrapping; back one, so that the
+			   first sample is not lost */
+			source -= rax_incs;
+			cpunum_set_reg( rax_cpunum, ADSP2100_I0 + rax_ireg, source );
+			rax_ireg_base = source;
+
+			/* a sample every 16 serial clocks; the DACs at that rate */
+			rax_sample_rate = RAX_CLOCK / ( 16 * ( rax_control_regs[ RAX_S0_SCLKDIV_REG ] + 1 ) );
+			rax_sample_step = (UINT32)( (double)rax_sample_rate * 65536.0 / (double)Machine->sample_rate );
+			rax_dac_enabled[ 0 ] = rax_dac_enabled[ 1 ] = 1;
+
+			/* a timer every quarter of the buffer (two samples per pair) */
+			if( rax_incs )
+			{
+				rax_reg_timer_period = TIME_IN_HZ( rax_sample_rate ) * rax_size / ( 4 * 2 * rax_incs );
+				timer_adjust( rax_reg_timer, rax_reg_timer_period, 0, rax_reg_timer_period );
+			}
+			return;
+		}
+	}
+
+	/* anything else: no sound */
+	stream_update( rax_stream, 0 );
+	rax_dac_enabled[ 0 ] = rax_dac_enabled[ 1 ] = 0;
+	rax_buffer_in[ 0 ] = rax_buffer_out[ 0 ] = rax_buffer_in[ 1 ] = rax_buffer_out[ 1 ] = 0;
+	timer_adjust( rax_reg_timer, TIME_NEVER, 0, 0 );
+	rax_reg_timer_period = 0;
+}
+
+/* both DACs, resampled to the output rate; silence when one runs out */
+static void rax_dac_update( int num, INT16 **buffer, int length )
+{
+	UINT32 n_end = rax_sample_position;
+	int n_channel;
+
+	for( n_channel = 0; n_channel < 2; n_channel++ )
+	{
+		INT16 *dest = buffer[ n_channel ];
+		UINT32 current = rax_sample_position;
+		UINT32 n_used;
+		int i;
+
+		for( i = 0; i < length; i++ )
+		{
+			UINT32 n_index = rax_buffer_out[ n_channel ] + ( current >> 16 );
+			if( !rax_dac_enabled[ n_channel ] || n_index >= rax_buffer_in[ n_channel ] )
+				break;
+			dest[ i ] = rax_buffer[ n_channel ][ n_index & RAX_BUFFER_MASK ];
+			current += rax_sample_step;
+		}
+		for( ; i < length; i++ )
+			dest[ i ] = 0;
+
+		/* drop the samples played, keep the fraction */
+		n_used = current >> 16;
+		if( n_used > rax_buffer_in[ n_channel ] - rax_buffer_out[ n_channel ] )
+			n_used = rax_buffer_in[ n_channel ] - rax_buffer_out[ n_channel ];
+		rax_buffer_out[ n_channel ] += n_used;
+		if( n_channel == 0 )
+			n_end = current & 0xffff;
+	}
+	rax_sample_position = n_end;
+}
+
+static int rax_custom_start( const struct MachineSound *msound )
+{
+	const char *names[] = { "RAX DAC L", "RAX DAC R" };
+	int vols[] = { MIXER( 100, MIXER_PAN_LEFT ), MIXER( 100, MIXER_PAN_RIGHT ) };
+	int i;
+
+	rax_stream = stream_init_multi( 2, names, vols, Machine->sample_rate, 0, rax_dac_update );
+	for( i = 0; i < 2; i++ )
+	{
+		rax_buffer[ i ] = auto_malloc( RAX_BUFFER_SIZE * sizeof( INT16 ) );
+		if( !rax_buffer[ i ] )
+			return 1;
+		memset( rax_buffer[ i ], 0, RAX_BUFFER_SIZE * sizeof( INT16 ) );
+	}
+	state_save_register_INT16( "rax", 0, "buffer_l", rax_buffer[ 0 ], RAX_BUFFER_SIZE );
+	state_save_register_INT16( "rax", 0, "buffer_r", rax_buffer[ 1 ], RAX_BUFFER_SIZE );
+	return 0;
+}
+
+static struct CustomSound_interface rax_custom_interface =
+{
+	rax_custom_start, 0, 0
+};
+
+static MEMORY_READ16_START( rax_readmem )
+	{ ADSP_DATA_ADDR_RANGE( 0x0000, 0x1fff ), MRA16_BANK14 },	/* internal RAM, or external through DMOVLAY */
+	{ ADSP_DATA_ADDR_RANGE( 0x2000, 0x3fdf ), MRA16_RAM },		/* internal RAM */
+	{ ADSP_DATA_ADDR_RANGE( 0x3fe0, 0x3fff ), rax_control_r },	/* control registers */
+	{ ADSP_PGM_ADDR_RANGE( 0x0000, 0x3fff ), MRA16_RAM },		/* internal program RAM */
+MEMORY_END
+
+static MEMORY_WRITE16_START( rax_writemem )
+	{ ADSP_DATA_ADDR_RANGE( 0x0000, 0x1fff ), MWA16_BANK14 },
+	{ ADSP_DATA_ADDR_RANGE( 0x2000, 0x3fdf ), MWA16_RAM },
+	{ ADSP_DATA_ADDR_RANGE( 0x3fe0, 0x3fff ), rax_control_w },
+	{ ADSP_PGM_ADDR_RANGE( 0x0000, 0x3fff ), MWA16_RAM },
+MEMORY_END
+
+static void rax_presave( void )
+{
+	rax_reg_timer_left = timer_timeleft( rax_reg_timer );
+	rax_dma_timer_left = timer_timeleft( rax_dma_timer );
+}
+
+static void rax_postload( void )
+{
+	rax_update_data_ram_bank();
+	if( rax_reg_timer_period > 0 && rax_reg_timer_left < TIME_NEVER / 2 )
+		timer_adjust( rax_reg_timer, ( rax_reg_timer_left > 0 ) ? rax_reg_timer_left : 0, 0, rax_reg_timer_period );
+	else
+		timer_adjust( rax_reg_timer, TIME_NEVER, 0, 0 );
+	if( rax_dma_timer_left < TIME_NEVER / 2 )
+		timer_adjust( rax_dma_timer, ( rax_dma_timer_left > 0 ) ? rax_dma_timer_left : 0, rax_dma_param, 0 );
+	else
+		timer_adjust( rax_dma_timer, TIME_NEVER, 0, 0 );
+}
+
+static void rax_init( int cpunum )
+{
+	rax_cpunum = cpunum;
+	rax_rom = memory_region( REGION_SOUND1 );
+	rax_banked_ram = auto_malloc( 0x2000 * 5 * sizeof( UINT16 ) );
+	memset( rax_banked_ram, 0, 0x2000 * 5 * sizeof( UINT16 ) );
+	rax_reg_timer = timer_alloc( rax_irq );
+	rax_dma_timer = timer_alloc( rax_dma_done );
+
+	adsp2181_set_tx_callback( rax_tx_callback );
+	adsp2181_set_io_callbacks( rax_io_r, rax_io_w );
+	adsp2181_set_dmovlay_callback( rax_dmovlay_w );
+
+	state_save_register_UINT16( "rax", 0, "banked_ram", rax_banked_ram, 0x2000 * 5 );
+	state_save_register_UINT16( "rax", 0, "control_regs", rax_control_regs, 32 );
+	state_save_register_UINT16( "rax", 0, "data_in", &rax_data_in, 1 );
+	state_save_register_UINT16( "rax", 0, "data_out", &rax_data_out, 1 );
+	state_save_register_UINT8( "rax", 0, "pf0", &rax_pf0, 1 );
+	state_save_register_UINT16( "rax", 0, "data_bank", &rax_data_bank, 1 );
+	state_save_register_UINT16( "rax", 0, "rom_bank", &rax_rom_bank, 1 );
+	state_save_register_UINT32( "rax", 0, "dmovlay", &rax_dmovlay, 1 );
+	state_save_register_UINT16( "rax", 0, "size", &rax_size, 1 );
+	state_save_register_UINT16( "rax", 0, "incs", &rax_incs, 1 );
+	state_save_register_INT32( "rax", 0, "ireg", &rax_ireg, 1 );
+	state_save_register_UINT16( "rax", 0, "ireg_base", &rax_ireg_base, 1 );
+	state_save_register_UINT8( "rax", 0, "dac_enabled", rax_dac_enabled, 2 );
+	state_save_register_double( "rax", 0, "reg_timer_period", &rax_reg_timer_period, 1 );
+	state_save_register_double( "rax", 0, "reg_timer_left", &rax_reg_timer_left, 1 );
+	state_save_register_double( "rax", 0, "dma_timer_left", &rax_dma_timer_left, 1 );
+	state_save_register_UINT32( "rax", 0, "dma_param", &rax_dma_param, 1 );
+	state_save_register_UINT32( "rax", 0, "buffer_in", rax_buffer_in, 2 );
+	state_save_register_UINT32( "rax", 0, "buffer_out", rax_buffer_out, 2 );
+	state_save_register_UINT32( "rax", 0, "sample_rate", &rax_sample_rate, 1 );
+	state_save_register_UINT32( "rax", 0, "sample_step", &rax_sample_step, 1 );
+	state_save_register_UINT32( "rax", 0, "sample_position", &rax_sample_position, 1 );
+	state_save_register_func_presave( rax_presave );
+	state_save_register_func_postload( rax_postload );
+}
+
+static void rax_reset( void )
+{
+	UINT32 *pgm = (UINT32 *)( memory_region( REGION_CPU1 + rax_cpunum ) + ADSP2181_PGM_OFFSET );
+	int i;
+
+	/* the boot: 32 program words (96 bytes) from the ROM, as by BDMA */
+	for( i = 0; i < 32; i++ )
+		pgm[ i ] = ( rax_rom[ i * 3 + 0 ] << 16 ) | ( rax_rom[ i * 3 + 1 ] << 8 ) | rax_rom[ i * 3 + 2 ];
+
+	rax_pf0 = 1;
+	rax_rom_bank = 0;
+	rax_size = 0;
+	rax_incs = 0;
+	rax_ireg = 0;
+	memset( rax_control_regs, 0, sizeof( rax_control_regs ) );
+	rax_dmovlay = 0;
+	rax_data_bank = 0;
+	rax_update_data_ram_bank();
+
+	rax_dac_enabled[ 0 ] = rax_dac_enabled[ 1 ] = 0;
+	rax_buffer_in[ 0 ] = rax_buffer_out[ 0 ] = rax_buffer_in[ 1 ] = rax_buffer_out[ 1 ] = 0;
+	rax_sample_position = 0;
+	rax_sample_step = 0x10000;
+	rax_reg_timer_period = 0;
+	timer_adjust( rax_reg_timer, TIME_NEVER, 0, 0 );
+	timer_adjust( rax_dma_timer, TIME_NEVER, 0, 0 );
+}
+
+/* from the main CPU: a command, IRQL0 on the ADSP */
+static void rax_data_w( UINT16 data )
+{
+	rax_data_in = data;
+	cpu_set_irq_line( rax_cpunum, ADSP2181_IRQL0, ASSERT_LINE );
+	cpu_boost_interleave( 0, TIME_IN_USEC( 5 ) );
+}
+
+
+/* the main board side */
+
+static UINT8 *nbajamex_sram;			/* 71256 */
+static UINT32 nbajamex_rombank[ 2 ];
+static UINT8 nbajamex_bankmap;			/* 0: backup RAM at 0x1f200000, 1: ROM bank 1 there */
+
+static void nbajamex_update_banks( void )
+{
+	UINT32 n_bank0 = ( ( nbajamex_rombank[ 0 ] >> 4 ) & 1 ) | ( ( nbajamex_rombank[ 0 ] & 7 ) << 1 );
+	cpu_setbank( 1, memory_region( REGION_USER1 ) + n_bank0 * 0x200000 );
+}
+
+static READ32_HANDLER( nbajamex_rom1_r )
+{
+	UINT32 n_address = offset * 4;	/* from 0x1f200000 */
+
+	if( !nbajamex_bankmap )
+	{
+		/* the backup RAM, bytes at byte addresses */
+		if( n_address < 0x8000 )
+			return nbajamex_sram[ n_address ] | ( nbajamex_sram[ n_address + 1 ] << 8 ) |
+				( nbajamex_sram[ n_address + 2 ] << 16 ) | ( nbajamex_sram[ n_address + 3 ] << 24 );
+		return 0;
+	}
+	else
+	{
+		UINT32 n_bank1 = ( ( ~nbajamex_rombank[ 1 ] >> 4 ) & 1 ) | ( ( nbajamex_rombank[ 1 ] & 7 ) << 1 );
+		UINT32 n_rom = n_bank1 * 0x200000 + n_address;
+		if( n_rom + 4 <= memory_region_length( REGION_USER1 ) )
+			return *(UINT32 *)( memory_region( REGION_USER1 ) + n_rom );
+		return 0;
+	}
+}
+
+static WRITE32_HANDLER( nbajamex_backup_w )
+{
+	UINT32 n_address = offset * 4;	/* from 0x1f200000 */
+	int n_lane;
+
+	for( n_lane = 0; n_lane < 4; n_lane++ )
+		if( !( mem_mask & ( 0xff << ( n_lane * 8 ) ) ) )
+			nbajamex_sram[ n_address + n_lane ] = data >> ( n_lane * 8 );
+}
+
+static WRITE32_HANDLER( nbajamex_bank_w )
+{
+	/* a 16-bit register in each half */
+	if( ( mem_mask & 0x0000ffff ) != 0x0000ffff )
+		nbajamex_rombank[ 0 ] = data & 0xffff;
+	if( ( mem_mask & 0xffff0000 ) != 0xffff0000 )
+		nbajamex_rombank[ 1 ] = data >> 16;
+	nbajamex_bankmap = ( nbajamex_rombank[ 0 ] != 0 );
+	nbajamex_update_banks();
+}
+
+static READ32_HANDLER( nbajamex_sound_08_r )
+{
+	return 0x400;	/* sound related */
+}
+
+static READ32_HANDLER( nbajamex_sound_80_r )
+{
+	return 0xffff;
+}
+
+static WRITE32_HANDLER( nbajamex_sound_80_w )
+{
+	/* all 16 bits go to the latch of the sound board (see the sound test) */
+	if( ( mem_mask & 0x0000ffff ) != 0x0000ffff )
+		rax_data_w( data & 0xffff );
+}
+
+static MEMORY_READ32_START( nbajamex_readmem )
+	ZN_MAIN_READ
+	{ 0x1f000000, 0x1f1fffff, MRA32_BANK1 },  /* game rom, bank 0 */
+	{ 0x1f200000, 0x1f7fffff, nbajamex_rom1_r },
+	{ 0x1fbfff08, 0x1fbfff0b, nbajamex_sound_08_r },
+	{ 0x1fbfff80, 0x1fbfff83, nbajamex_sound_80_r },
+MEMORY_END
+
+static MEMORY_WRITE32_START( nbajamex_writemem )
+	ZN_MAIN_WRITE
+	{ 0x1f000000, 0x1f1fffff, MWA32_ROM },
+	{ 0x1f200000, 0x1f207fff, nbajamex_backup_w },
+	{ 0x1f208000, 0x1f7fffff, MWA32_NOP },
+	{ 0x1fbfff00, 0x1fbfff03, nbajamex_bank_w },
+	{ 0x1fbfff10, 0x1fbfff13, MWA32_NOP },
+	{ 0x1fbfff80, 0x1fbfff83, nbajamex_sound_80_w },
+MEMORY_END
+
+static NVRAM_HANDLER( nbajamex )
+{
+	nvram_handler_zn( file, read_or_write );
+	if( read_or_write )
+		mame_fwrite( file, nbajamex_sram, 0x8000 );
+	else if( file )
+		mame_fread( file, nbajamex_sram, 0x8000 );
+	else
+		memset( nbajamex_sram, 0xff, 0x8000 );
+}
+
+static void nbajamex_postload( void )
+{
+	nbajamex_update_banks();
+}
+
+static DRIVER_INIT( nbajamex )
+{
+	zn_scratchpad = auto_malloc( 0x400 );
+	zn_eeprom = auto_malloc( 0x800 );
+	nbajamex_sram = auto_malloc( 0x8000 );
+	memset( zn_scratchpad, 0, 0x400 );
+	memset( zn_eeprom, 0xff, 0x800 );
+	memset( nbajamex_sram, 0xff, 0x8000 );
+
+	zn_vram_2mb = 1;
+	zn_coin_tecmo = 0;
+	zn_eeprom_default = 0;
+
+	zn_board_init();
+	znsec_init( 0, memory_region( REGION_USER4 ) );	/* AC01 */
+	znsec_init( 1, memory_region( REGION_USER5 ) );	/* AC02 */
+
+	rax_init( mame_find_cpu_index( "rax" ) );
+
+	state_save_register_UINT8( "zn", 0, "nbajamex_sram", nbajamex_sram, 0x8000 );
+	state_save_register_UINT32( "zn", 0, "nbajamex_rombank", nbajamex_rombank, 2 );
+	state_save_register_UINT8( "zn", 0, "nbajamex_bankmap", &nbajamex_bankmap, 1 );
+	state_save_register_UINT32( "zn", 0, "scratchpad", zn_scratchpad, 0x100 );
+	state_save_register_func_postload( nbajamex_postload );
+}
+
+static MACHINE_INIT( nbajamex )
+{
+	zn_board_reset();
+	nbajamex_rombank[ 0 ] = nbajamex_rombank[ 1 ] = 0;
+	nbajamex_bankmap = 0;
+	nbajamex_update_banks();
+	rax_reset();
+}
+
+/* ZN-1, 2MB VRAM (COH-1000A), SPU and the RAX sound board */
+static MACHINE_DRIVER_START( nbajamex )
+	MDRV_CPU_ADD_TAG( "main", PSXCPU, 33868800 / 2 )	/* CXD8530CQ, 67.7376MHz XTAL; as System 11 */
+	MDRV_CPU_MEMORY( nbajamex_readmem, nbajamex_writemem )
+	MDRV_CPU_VBLANK_INT( psx_vblank, 1 )
+
+	MDRV_CPU_ADD_TAG( "rax", ADSP2181, RAX_CLOCK )
+	MDRV_CPU_FLAGS( CPU_AUDIO_CPU )
+	MDRV_CPU_MEMORY( rax_readmem, rax_writemem )
+
+	MDRV_FRAMES_PER_SECOND( 60 )
+	MDRV_VBLANK_DURATION( 0 )
+
+	MDRV_MACHINE_INIT( nbajamex )
+	MDRV_NVRAM_HANDLER( nbajamex )
+
+	MDRV_VIDEO_ATTRIBUTES( VIDEO_TYPE_RASTER | VIDEO_RGB_DIRECT )
+	MDRV_SCREEN_SIZE( 640, 480 )
+	MDRV_VISIBLE_AREA( 0, 639, 0, 479 )
+	MDRV_PALETTE_LENGTH( 65536 )
+
+	MDRV_PALETTE_INIT( psx )
+	MDRV_VIDEO_START( psx_type2_1024x1024 )
+	MDRV_VIDEO_UPDATE( psx )
+	MDRV_VIDEO_STOP( psx )
+
+	MDRV_SOUND_ATTRIBUTES( SOUND_SUPPORTS_STEREO )
+	MDRV_SOUND_ADD( PSXSPU, zn_spu_interface )
+	MDRV_SOUND_ADD( CUSTOM, rax_custom_interface )
 MACHINE_DRIVER_END
 
 
@@ -2457,6 +3313,67 @@ INPUT_PORTS_START( tgmj )
 	TPS_SYSTEM_PORT( 1, 1, 0 )
 	TPS_UNUSED_PORT
 	TPS_UNUSED_PORT
+	ZN_DSW_PORT
+INPUT_PORTS_END
+
+/* Primal Rage 2: two players, six buttons; buttons 4 to 6 of both players
+   on the P4 inputs */
+INPUT_PORTS_START( primrag2 )
+	TPS_PLAYER_PORT( 1, 1, 0 )
+	TPS_PLAYER_PORT( 2, 1, 0 )
+	TPS_SERVICE_PORT( 0 )
+	TPS_SYSTEM_PORT( 1, 1, 0 )
+	TPS_UNUSED_PORT
+	PORT_START	/* P4 */
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_BUTTON4 | IPF_PLAYER1 )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON5 | IPF_PLAYER1 )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON6 | IPF_PLAYER1 )
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON4 | IPF_PLAYER2 )
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON5 | IPF_PLAYER2 )
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON6 | IPF_PLAYER2 )
+	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNUSED )
+	ZN_DSW_PORT
+INPUT_PORTS_END
+
+/* Judge Dredd: two light guns, a trigger and a button each */
+INPUT_PORTS_START( jdredd )
+	PORT_START	/* P1 */
+	PORT_BIT( 0xef, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER1 )
+	PORT_START	/* P2 */
+	PORT_BIT( 0xef, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON2 | IPF_PLAYER2 )
+	PORT_START	/* SERVICE */
+	PORT_BITX( 0x01, IP_ACTIVE_LOW, IPT_SERVICE, DEF_STR( Service_Mode ), KEYCODE_F2, IP_JOY_NONE )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_SERVICE1 )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_TILT )
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )	/* gun mux, from the driver */
+	PORT_BIT( 0x30, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER1 )
+	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_BUTTON1 | IPF_PLAYER2 )
+	TPS_SYSTEM_PORT( 1, 1, 0 )
+	TPS_UNUSED_PORT
+	TPS_UNUSED_PORT
+	ZN_DSW_PORT
+	PORT_START	/* GUN1X */
+	PORT_ANALOG( 0xffff, 0x0822, IPT_LIGHTGUN_X | IPF_PLAYER1, 100, 50, 0x392, 0xcb3 )
+	PORT_START	/* GUN1Y */
+	PORT_ANALOG( 0xffff, 0x0122, IPT_LIGHTGUN_Y | IPF_PLAYER1, 100, 15, 0x02c, 0x218 )
+	PORT_START	/* GUN2X */
+	PORT_ANALOG( 0xffff, 0x0822, IPT_LIGHTGUN_X | IPF_PLAYER2, 100, 50, 0x392, 0xcb3 )
+	PORT_START	/* GUN2Y */
+	PORT_ANALOG( 0xffff, 0x0122, IPT_LIGHTGUN_Y | IPF_PLAYER2, 100, 15, 0x02c, 0x218 )
+INPUT_PORTS_END
+
+/* four players, four buttons */
+INPUT_PORTS_START( nbajamex )
+	TPS_PLAYER_PORT( 1, 1, 1 )
+	TPS_PLAYER_PORT( 2, 1, 1 )
+	TPS_SERVICE_PORT( 0 )
+	TPS_SYSTEM_PORT( 1, 1, 1 )
+	TPS_PLAYER_PORT( 3, 1, 1 )
+	TPS_PLAYER_PORT( 4, 1, 1 )
 	ZN_DSW_PORT
 INPUT_PORTS_END
 
@@ -4644,16 +5561,6 @@ ROM_START( gdariusj )
 	ROM_LOAD( "tt07", 0x000000, 0x000008, CRC(ccf2f332) SHA1(6eb07cd5fab29f5536fd94aa88a2b09f28cc3494) )
 ROM_END
 
-/* Taito FX1 old BIOS layout, for the Beastorizer bootleg (zn machine) */
-
-#define TAITOFX1_BIOS \
-	ROM_REGION( 0x480400, REGION_CPU1, 0 ) \
-	ROM_LOAD( "coh1002t.bin", 0x0400000, 0x080000, CRC(e3f23b6e) SHA1(e18907cf8c6ba54d96edba0a9a00487a90219e0d) )
-
-ROM_START( taitofx1 )
-	TAITOFX1_BIOS
-ROM_END
-
 /* Eighting / Raizing (COH-1002E) */
 
 #define RAIZING_BIOS \
@@ -4921,105 +5828,164 @@ ROM_START( brvbladej )
 	ROM_LOAD( "mg11", 0x000000, 0x000008, CRC(56d917de) SHA1(3c1cdbf552265dbff6051853d933ac34047bcdae) )
 ROM_END
 
-ROM_START( beastrzb )
-	TAITOFX1_BIOS
+ROM_START( beastrzrb )
+	RAIZING_BIOS
 
-	ROM_REGION32_LE( 0x0900000, REGION_USER1, 0 )
-	ROM_LOAD( "27c160.1",     0x0000000, 0x200000, CRC(820855e2) SHA1(18bdd4d0b4a92ae4fde457e1f37c813be6eece71) )
-	ROM_LOAD( "27c160.2",     0x0200000, 0x200000, CRC(1712af34) SHA1(3a78997a2ad0fec1b09828b47150a4be611cd9ad) )
-	ROM_LOAD( "4",            0x0400000, 0x200000, CRC(bff21f44) SHA1(2dffc518c069f0692a3b75e10091658d9c10ecb5) )
-	ROM_LOAD( "27c160.5",     0x0600000, 0x200000, CRC(10fe6f4d) SHA1(9faee2faa6d741e1caf25edd093644be5723aa5c) )
-	ROM_LOAD( "27c800.3",     0x0800000, 0x100000, CRC(7192eb4e) SHA1(bb276a38261099d91080d8613dc7500322f6fcab) )
+	ROM_REGION32_LE( 0x1800000, REGION_USER1, 0 ) /* game rom, 8MB banks */
+	ROM_LOAD( "27c160.1", 0x000000, 0x200000, CRC(820855e2) SHA1(18bdd4d0b4a92ae4fde457e1f37c813be6eece71) )
+	ROM_LOAD( "27c160.4", 0x400000, 0x200000, CRC(2d2b25f4) SHA1(77d8ad94602e71f16b47de47bc2e0a97957c530b) )
+	ROM_LOAD( "27c160.5", 0x600000, 0x200000, CRC(10fe6f4d) SHA1(9faee2faa6d741e1caf25edd093644be5723aa5c) )
+	ROM_LOAD( "27c160.2", 0x800000, 0x200000, CRC(1712af34) SHA1(3a78997a2ad0fec1b09828b47150a4be611cd9ad) )
+	ROM_LOAD( "27c800.3", 0xb00000, 0x100000, CRC(7192eb4e) SHA1(bb276a38261099d91080d8613dc7500322f6fcab) )
 
-	ROM_REGION( 0x180000, REGION_CPU2, 0 )
-	ROM_LOAD( "27c4096.1",    0x0000000, 0x080000, CRC(217734a1) SHA1(de4f519215123c09b3b5f27509b4d74604b5e03d) )
-	ROM_LOAD( "27c4096.2",    0x0080000, 0x080000, CRC(d1f2a9b2) SHA1(d1475a453ce4e3b9f2ff59abedf0f57ba3c408fe) )
-	ROM_LOAD( "27c240.3",     0x0100000, 0x080000, CRC(509cdc8b) SHA1(8b92b79be09de56e7d40c2d02fcbeca92bb60226) )
+	ROM_REGION( 0x001000, REGION_CPU2, 0 ) /* AT89C4051, not emulated */
+	ROM_LOAD( "at89c4051", 0x000000, 0x001000, NO_DUMP ) /* undumped internal ROM */
+
+	ROM_REGION( 0x100000, REGION_SOUND1, 0 ) /* OKI M6295, not emulated */
+	ROM_LOAD( "27c4096.1", 0x000000, 0x080000, CRC(217734a1) SHA1(de4f519215123c09b3b5f27509b4d74604b5e03d) )
+	ROM_LOAD( "27c4096.2", 0x080000, 0x080000, CRC(d1f2a9b2) SHA1(d1475a453ce4e3b9f2ff59abedf0f57ba3c408fe) )
+
+	ROM_REGION( 0x080000, REGION_USER2, 0 ) /* bootleg protection, not used (as MAME) */
+	ROM_LOAD( "27c240.3", 0x000000, 0x080000, BAD_DUMP CRC(509cdc8b) SHA1(8b92b79be09de56e7d40c2d02fcbeca92bb60226) )
+
+	ROM_REGION( 0x000008, REGION_USER5, 0 ) /* CAT702, rom board */
+	ROM_LOAD( "et02", 0x000000, 0x000008, CRC(187ce61a) SHA1(521122b0f7b3f278dd2a2b1d73c252b952b5f55d) )
 ROM_END
 
 
-/* Atari PSX */
+/* Atari / Time Warner (COH-1000W), MAME names */
 
-#define AT_BIOS \
-	ROM_REGION( 0x480400, REGION_CPU1, 0 ) \
-	ROM_LOAD( "coh1000t.bin", 0x0400000, 0x080000, NO_DUMP )
+#define TIME_WARNER_BIOS \
+	ROM_REGION32_LE( 0x800000, REGION_CPU1, ROMREGION_ERASE00 ) /* ram, 8MB */ \
+	ROM_REGION32_LE( 0x080000, REGION_USER3, 0 ) /* bios */ \
+	ROM_LOAD( "msm27c402zb.ic353", 0x000000, 0x080000, CRC(45e8a4b4) SHA1(815488d8563c85f97fbc3384ff21f08e4c88b7b7) ) \
+	ROM_REGION( 0x000008, REGION_USER4, 0 ) /* CAT702, main board */ \
+	ROM_LOAD( "tw01.ic652", 0x000000, 0x000008, CRC(1cac067e) SHA1(8e87941bfb374172628c8a37647e3a66b7166aa8) )
 
-ROM_START( atpsx )
-	AT_BIOS
+ROM_START( coh1000w )
+	TIME_WARNER_BIOS
 ROM_END
 
 ROM_START( primrag2 )
-	AT_BIOS
+	TIME_WARNER_BIOS
 
-	ROM_REGION32_LE( 0x080000, REGION_USER1, 0 )
-	ROM_LOAD( "pr2_036.u14",  0x000000, 0x080000, CRC(c86450cd) SHA1(19c3c50d839a9efb6ffa9ada8a072f56697c1abb) ) 
-	ROM_LOAD( "pr2_036.u15",  0x000000, 0x080000, CRC(4b24bd54) SHA1(7f27cd524d10e5869aab6d4dc6a4217d049c475d) ) 
-	ROM_LOAD( "pr2_036.u16",  0x000000, 0x080000, CRC(3ee39e4f) SHA1(dbd859b54fb9be33effc14eb847dcd829024eea3) ) 
-	ROM_LOAD( "pr2_036.u17",  0x000000, 0x080000, CRC(3681516c) SHA1(714f73ea4ac190c36a6eb2308616a4aecabc4e69) ) 
+	ROM_REGION32_LE( 0x200000, REGION_USER1, 0 ) /* game rom */
+	ROM_LOAD16_BYTE( "pr2_036.u16",  0x000001, 0x080000, CRC(3ee39e4f) SHA1(dbd859b54fb9be33effc14eb847dcd829024eea3) )
+	ROM_LOAD16_BYTE( "pr2_036.u14",  0x000000, 0x080000, CRC(c86450cd) SHA1(19c3c50d839a9efb6ffa9ada8a072f56697c1abb) )
+	ROM_LOAD16_BYTE( "pr2_036.u17",  0x100001, 0x080000, CRC(3681516c) SHA1(714f73ea4ac190c36a6eb2308616a4aecabc4e69) )
+	ROM_LOAD16_BYTE( "pr2_036.u15",  0x100000, 0x080000, CRC(4b24bd54) SHA1(7f27cd524d10e5869aab6d4dc6a4217d049c475d) )
+
+	ROM_REGION( 0x000800, REGION_USER6, 0 ) /* at28c16, factory settings */
+	ROM_LOAD( "at28c16", 0x000000, 0x000800, CRC(62c21283) SHA1(6013d831fb97c025682603a1bb9d62bd93e1b893) )
+
+	ROM_REGION( 0x000008, REGION_USER5, 0 ) /* CAT702, rom board */
+	ROM_LOAD( "tw02", 0x000000, 0x000008, CRC(583e8e1c) SHA1(0af99e3feb3fa684883a5daefba2c38a442f3884) )
 
 	DISK_REGION( REGION_DISKS )
-/*	DISK_IMAGE() */
+	DISK_IMAGE( "primrag2", 0, SHA1(bc615068ddf4fd967f770ee01c02f285c052c4c5) )
 ROM_END
 
-/* Acclaim PSX */
+#define ACCLAIM_BIOS \
+	ROM_REGION32_LE( 0x400000, REGION_CPU1, ROMREGION_ERASE00 ) /* ram */ \
+	ROM_REGION32_LE( 0x080000, REGION_USER3, 0 ) /* bios */ \
+	ROM_LOAD( "m534002c-15.ic353", 0x000000, 0x080000, CRC(8d8d0764) SHA1(7ee83d317190bb1cef2f8f01c81eaaae47150ebb) ) \
+	ROM_REGION( 0x000008, REGION_USER4, 0 ) /* CAT702, main board */ \
+	ROM_LOAD( "ac01.ic652", 0x000000, 0x000008, CRC(c425eaf5) SHA1(decf77ab50f7f58c641c3214a11647924f3a8998) )
 
-#define AC_BIOS \
-	ROM_REGION( 0x480400, REGION_CPU1, 0 ) \
-	ROM_LOAD( "coh1000a.bin", 0x0400000, 0x080000, CRC(8d8d0764) SHA1(7ee83d317190bb1cef2f8f01c81eaaae47150ebb) )
-
-ROM_START( acpsx )
-	AC_BIOS
-ROM_END
-
-ROM_START( nbajamex )
-	AC_BIOS
-
-	ROM_REGION32_LE( 0x01a00000, REGION_USER1, 0 )
-	ROM_LOAD( "360mpa1e.u35", 0x000000, 0x100000, CRC(d8f5b2f7) SHA1(e38609d314721b8b612e047406e2888395917b0d) ) 
-	ROM_LOAD( "360mpa1o.u36", 0x000000, 0x100000, CRC(c433e827) SHA1(1d2a5a6990a1b1864e63ce3ba7306d48ebbd4775) ) 
-	ROM_LOAD( "nbax0e.u41",   0x000000, 0x200000, CRC(077f4355) SHA1(63c52bb82943b52bb0906d114acd5ea8643068b6) ) 
-	ROM_LOAD( "nbax0o.u28",   0x000000, 0x200000, CRC(be13c5af) SHA1(eee5c9d985384ecfe4f00fae27d66fbefc15b28e) ) 
-	ROM_LOAD( "nbax1e.u42",   0x000000, 0x200000, CRC(f1212cf9) SHA1(b2f80af3ec4d559056e86f695d89d1d32b500f50) ) 
-	ROM_LOAD( "nbax1o.u29",   0x000000, 0x200000, CRC(3650e85b) SHA1(a36bfa235c8e3bb516e178f54d3c5e3955c7e918) ) 
-	ROM_LOAD( "nbax2e.u43",   0x000000, 0x200000, CRC(c20ab628) SHA1(7ffe5005e1913da56770452ae2f907a4a270ab24) ) 
-	ROM_LOAD( "nbax2o.u30",   0x000000, 0x200000, CRC(ccbb6125) SHA1(998eda99182b984f88f5fc58095cb35bf232a26b) ) 
-	ROM_LOAD( "nbax3e.u44",   0x000000, 0x200000, CRC(07ba00a3) SHA1(c14bffd35ee715b07d6065b454b0443438ab6536) ) 
-	ROM_LOAD( "nbax3o.u31",   0x000000, 0x200000, CRC(d5238edf) SHA1(d1eb30ec65dd6cfa8cbb2b36af3a83820d1de99a) ) 
-	ROM_LOAD( "nbax4e.u17",   0x000000, 0x200000, CRC(b5977765) SHA1(08acdfe413a5a9182ca117f44b7acac9dac9ecea) ) 
-	ROM_LOAD( "nbax4o.u3",    0x000000, 0x200000, CRC(1cf16a34) SHA1(a7e984a2db846854f1c4a9a2fdefd0d17ce3108c) ) 
-	ROM_LOAD( "nbax5e.u18",   0x000000, 0x200000, CRC(0eb917da) SHA1(d6c8991ba7cd492668757658ee64078d0e82b596) ) 
-	ROM_LOAD( "nbax5o.u4",    0x000000, 0x200000, CRC(5272754b) SHA1(c35ba5377eb812991e4bf0d954a34af90b986341) ) 
-	ROM_LOAD( "nbax6e.u19",   0x000000, 0x200000, CRC(6f17d8c1) SHA1(22cf263efb64cf62030e02b641c485debe75944d) ) 
-	ROM_LOAD( "nbax6o.u5",    0x000000, 0x200000, CRC(b1dfb42e) SHA1(fb9627e228bf2a744842eb44afbca4a6232cadb2) ) 
-
-	ROM_REGION( 0x01a00000, REGION_CPU2, 0 )
-	ROM_LOAD( "sound0.u48",   0x000000, 0x200000, CRC(38873b67) SHA1(b2f8d32270ae604c099a1b9b71d2e06468c7d4a9) ) 
-	ROM_LOAD( "sound1.u49",   0x000000, 0x200000, CRC(57014589) SHA1(d360ff1c52424bd91a5a8d1a2a9c10bf7abb0602) ) 
-
-	ROM_REGION( 0x01a00000, REGION_SOUND1, 0 )
-	ROM_LOAD( "360snda1.u52", 0x000000, 0x080000, CRC(36d8a628) SHA1(944a01c9128f5e90c7dba3557a3ecb2c5ca90831) ) 
+ROM_START( coh1000a )
+	ACCLAIM_BIOS
 ROM_END
 
 ROM_START( jdredd )
-	AC_BIOS
+	ACCLAIM_BIOS
 
-	ROM_REGION32_LE( 0x01a00000, REGION_USER1, 0 )
-	ROM_LOAD( "j-dread.u35",  0x000000, 0x020000, CRC(c1e17191) SHA1(82901439b1a51b9aadb4df4b9d944f26697a1460) ) 
-	ROM_LOAD( "j-dread.u36",  0x000000, 0x020000, CRC(37addbf9) SHA1(a4061a1ba9e230f080f0bfea69bf77efe9264a92) ) 
+	ROM_REGION32_LE( 0x200000, REGION_USER1, 0 ) /* game rom */
+	ROM_LOAD16_BYTE( "9e54_01-16-98_1566_u_36.u36",  0x000001, 0x020000, CRC(37addbf9) SHA1(a4061a1ba9e230f080f0bfea69bf77efe9264a92) )
+	ROM_LOAD16_BYTE( "79d3_01-16-98_1565_u_35.u35",  0x000000, 0x020000, CRC(c1e17191) SHA1(82901439b1a51b9aadb4df4b9d944f26697a1460) )
+
+	ROM_REGION( 0x000008, REGION_USER5, 0 ) /* CAT702, rom board */
+	ROM_LOAD( "ac02", 0x000000, 0x000008, CRC(1412d475) SHA1(c2f62232a261870f58353d09dc0d6ce2ad17a729) )
 
 	DISK_REGION( REGION_DISKS )
-	DISK_IMAGE( "jdreddc", 0, MD5(b66074f3df1e90ec4e3ff09dcdf33033) SHA1(83ed8df25d100b1c060f4dde2f162ba31803db7d) )
+	DISK_IMAGE( "jdreddc", 0, SHA1(eee205f83e5f590f8baf36452c873d7063156bd0) )	/* 1576 Rev.C */
 ROM_END
 
 ROM_START( jdreddb )
-	AC_BIOS
+	ACCLAIM_BIOS
 
-	ROM_REGION32_LE( 0x01a00000, REGION_USER1, 0 )
-	ROM_LOAD( "j-dread.u35",  0x000000, 0x020000, CRC(c1e17191) SHA1(82901439b1a51b9aadb4df4b9d944f26697a1460) ) 
-	ROM_LOAD( "j-dread.u36",  0x000000, 0x020000, CRC(37addbf9) SHA1(a4061a1ba9e230f080f0bfea69bf77efe9264a92) ) 
+	ROM_REGION32_LE( 0x200000, REGION_USER1, 0 ) /* game rom */
+	ROM_LOAD16_BYTE( "9e54_11-21-97_1566_u_36.u36",  0x000001, 0x020000, CRC(37addbf9) SHA1(a4061a1ba9e230f080f0bfea69bf77efe9264a92) )
+	ROM_LOAD16_BYTE( "79d3_11-21-97_1565_u_35.u35",  0x000000, 0x020000, CRC(c1e17191) SHA1(82901439b1a51b9aadb4df4b9d944f26697a1460) )
+
+	ROM_REGION( 0x000008, REGION_USER5, 0 ) /* CAT702, rom board */
+	ROM_LOAD( "ac02", 0x000000, 0x000008, CRC(1412d475) SHA1(c2f62232a261870f58353d09dc0d6ce2ad17a729) )
 
 	DISK_REGION( REGION_DISKS )
-	DISK_IMAGE( "jdreddb", 0, MD5(0da1d048d7223df74fca4f349473cefa) SHA1(9b810e3a16de62cabfc8271b6606574c7034cf41) )
+	DISK_IMAGE( "jdreddb", 0, SHA1(20f696fa6e1fbf97793bac2a794631c5dd4fb39a) )	/* 1576 Rev.B */
+ROM_END
+
+ROM_START( nbajamex )
+	ACCLAIM_BIOS
+
+	ROM_REGION32_LE( 0x2000000, REGION_USER1, 0 ) /* game rom, 16 banks of 2MB */
+	ROM_LOAD16_BYTE( "nba_jam_110i_odd_cs_cc48.u36",  0x0000001, 0x100000, CRC(533041e7) SHA1(691a11a031e61d892db74c4c29b6a999917c341b) )	/* labeled  NBA JAM 1.10I  ODD  CS = CC48 */
+	ROM_LOAD16_BYTE( "nba_jam_110i_even_cs_9567.u35", 0x0000000, 0x100000, CRC(63d7f15d) SHA1(23525e875d0e61763301e95f70964bc9df3a2624) )	/* labeled  NBA JAM 1.10I  EVEN  CS = 9567 */
+	ROM_LOAD16_BYTE( "nba0o.u28",   0x0200001, 0x200000, CRC(be13c5af) SHA1(eee5c9d985384ecfe4f00fae27d66fbefc15b28e) )
+	ROM_LOAD16_BYTE( "nba0e.u41",   0x0200000, 0x200000, CRC(077f4355) SHA1(63c52bb82943b52bb0906d114acd5ea8643068b6) )
+	ROM_LOAD16_BYTE( "nba1o.u29",   0x0600001, 0x200000, CRC(3650e85b) SHA1(a36bfa235c8e3bb516e178f54d3c5e3955c7e918) )
+	ROM_LOAD16_BYTE( "nba1e.u42",   0x0600000, 0x200000, CRC(f1212cf9) SHA1(b2f80af3ec4d559056e86f695d89d1d32b500f50) )
+	ROM_LOAD16_BYTE( "nba2o.u30",   0x0a00001, 0x200000, CRC(ccbb6125) SHA1(998eda99182b984f88f5fc58095cb35bf232a26b) )
+	ROM_LOAD16_BYTE( "nba2e.u43",   0x0a00000, 0x200000, CRC(c20ab628) SHA1(7ffe5005e1913da56770452ae2f907a4a270ab24) )
+	ROM_LOAD16_BYTE( "nba3o.u31",   0x0e00001, 0x200000, CRC(d5238edf) SHA1(d1eb30ec65dd6cfa8cbb2b36af3a83820d1de99a) )
+	ROM_LOAD16_BYTE( "nba3e.u44",   0x0e00000, 0x200000, CRC(07ba00a3) SHA1(c14bffd35ee715b07d6065b454b0443438ab6536) )
+	ROM_LOAD16_BYTE( "nba4o.u3",    0x1200001, 0x200000, CRC(1cf16a34) SHA1(a7e984a2db846854f1c4a9a2fdefd0d17ce3108c) )
+	ROM_LOAD16_BYTE( "nba4e.u17",   0x1200000, 0x200000, CRC(b5977765) SHA1(08acdfe413a5a9182ca117f44b7acac9dac9ecea) )
+	ROM_LOAD16_BYTE( "nba5o.u4",    0x1600001, 0x200000, CRC(5272754b) SHA1(c35ba5377eb812991e4bf0d954a34af90b986341) )
+	ROM_LOAD16_BYTE( "nba5e.u18",   0x1600000, 0x200000, CRC(0eb917da) SHA1(d6c8991ba7cd492668757658ee64078d0e82b596) )
+	ROM_LOAD16_BYTE( "nba6o.u5",    0x1a00001, 0x200000, CRC(b1dfb42e) SHA1(fb9627e228bf2a744842eb44afbca4a6232cadb2) )
+	ROM_LOAD16_BYTE( "nba6e.u19",   0x1a00000, 0x200000, CRC(6f17d8c1) SHA1(22cf263efb64cf62030e02b641c485debe75944d) )
+
+	ROM_REGION( ADSP2100_SIZE, REGION_CPU2, ROMREGION_ERASE00 )	/* ADSP-2181 internal RAM */
+
+	ROM_REGION( 0x800000, REGION_SOUND1, 0 )	/* RAX: two banks of 4MB */
+	ROM_LOAD( "360snda1.u52", 0x000000, 0x080000, CRC(36d8a628) SHA1(944a01c9128f5e90c7dba3557a3ecb2c5ca90831) )
+	ROM_LOAD( "sound0.u48",   0x400000, 0x200000, CRC(38873b67) SHA1(b2f8d32270ae604c099a1b9b71d2e06468c7d4a9) )
+	ROM_LOAD( "sound1.u49",   0x600000, 0x200000, CRC(57014589) SHA1(d360ff1c52424bd91a5a8d1a2a9c10bf7abb0602) )
+
+	ROM_REGION( 0x000008, REGION_USER5, 0 ) /* CAT702, rom board */
+	ROM_LOAD( "ac02", 0x000000, 0x000008, CRC(1412d475) SHA1(c2f62232a261870f58353d09dc0d6ce2ad17a729) )
+ROM_END
+
+ROM_START( nbajamexa )
+	ACCLAIM_BIOS
+
+	ROM_REGION32_LE( 0x2000000, REGION_USER1, 0 ) /* game rom, 16 banks of 2MB */
+	ROM_LOAD16_BYTE( "360-mp-a1_odd_cs_e0fe.u36",  0x0000001, 0x100000, CRC(c433e827) SHA1(1d2a5a6990a1b1864e63ce3ba7306d48ebbd4775) )	/* labeled  360-MP-A1  ODD  CS = E0FE */
+	ROM_LOAD16_BYTE( "360-mp-a1_even_cs_295a.u35", 0x0000000, 0x100000, CRC(d8f5b2f7) SHA1(e38609d314721b8b612e047406e2888395917b0d) )	/* labeled  360-MP-A1  EVEN  CS = 295A */
+	ROM_LOAD16_BYTE( "nba0o.u28",   0x0200001, 0x200000, CRC(be13c5af) SHA1(eee5c9d985384ecfe4f00fae27d66fbefc15b28e) )
+	ROM_LOAD16_BYTE( "nba0e.u41",   0x0200000, 0x200000, CRC(077f4355) SHA1(63c52bb82943b52bb0906d114acd5ea8643068b6) )
+	ROM_LOAD16_BYTE( "nba1o.u29",   0x0600001, 0x200000, CRC(3650e85b) SHA1(a36bfa235c8e3bb516e178f54d3c5e3955c7e918) )
+	ROM_LOAD16_BYTE( "nba1e.u42",   0x0600000, 0x200000, CRC(f1212cf9) SHA1(b2f80af3ec4d559056e86f695d89d1d32b500f50) )
+	ROM_LOAD16_BYTE( "nba2o.u30",   0x0a00001, 0x200000, CRC(ccbb6125) SHA1(998eda99182b984f88f5fc58095cb35bf232a26b) )
+	ROM_LOAD16_BYTE( "nba2e.u43",   0x0a00000, 0x200000, CRC(c20ab628) SHA1(7ffe5005e1913da56770452ae2f907a4a270ab24) )
+	ROM_LOAD16_BYTE( "nba3o.u31",   0x0e00001, 0x200000, CRC(d5238edf) SHA1(d1eb30ec65dd6cfa8cbb2b36af3a83820d1de99a) )
+	ROM_LOAD16_BYTE( "nba3e.u44",   0x0e00000, 0x200000, CRC(07ba00a3) SHA1(c14bffd35ee715b07d6065b454b0443438ab6536) )
+	ROM_LOAD16_BYTE( "nba4o.u3",    0x1200001, 0x200000, CRC(1cf16a34) SHA1(a7e984a2db846854f1c4a9a2fdefd0d17ce3108c) )
+	ROM_LOAD16_BYTE( "nba4e.u17",   0x1200000, 0x200000, CRC(b5977765) SHA1(08acdfe413a5a9182ca117f44b7acac9dac9ecea) )
+	ROM_LOAD16_BYTE( "nba5o.u4",    0x1600001, 0x200000, CRC(5272754b) SHA1(c35ba5377eb812991e4bf0d954a34af90b986341) )
+	ROM_LOAD16_BYTE( "nba5e.u18",   0x1600000, 0x200000, CRC(0eb917da) SHA1(d6c8991ba7cd492668757658ee64078d0e82b596) )
+	ROM_LOAD16_BYTE( "nba6o.u5",    0x1a00001, 0x200000, CRC(b1dfb42e) SHA1(fb9627e228bf2a744842eb44afbca4a6232cadb2) )
+	ROM_LOAD16_BYTE( "nba6e.u19",   0x1a00000, 0x200000, CRC(6f17d8c1) SHA1(22cf263efb64cf62030e02b641c485debe75944d) )
+
+	ROM_REGION( ADSP2100_SIZE, REGION_CPU2, ROMREGION_ERASE00 )	/* ADSP-2181 internal RAM */
+
+	ROM_REGION( 0x800000, REGION_SOUND1, 0 )	/* RAX: two banks of 4MB */
+	ROM_LOAD( "360snda1.u52", 0x000000, 0x080000, CRC(36d8a628) SHA1(944a01c9128f5e90c7dba3557a3ecb2c5ca90831) )
+	ROM_LOAD( "sound0.u48",   0x400000, 0x200000, CRC(38873b67) SHA1(b2f8d32270ae604c099a1b9b71d2e06468c7d4a9) )
+	ROM_LOAD( "sound1.u49",   0x600000, 0x200000, CRC(57014589) SHA1(d360ff1c52424bd91a5a8d1a2a9c10bf7abb0602) )
+
+	ROM_REGION( 0x000008, REGION_USER5, 0 ) /* CAT702, rom board */
+	ROM_LOAD( "ac02", 0x000000, 0x000008, CRC(1412d475) SHA1(c2f62232a261870f58353d09dc0d6ce2ad17a729) )
 ROM_END
 
 /* Capcom ZN-1 */
@@ -5077,13 +6043,8 @@ GAMEX( 1999, shiryu2,  strider2, coh3002c, strider2, coh3002c, ROT0, "Capcom", "
 
 /* Atari */
 
-/* A dummy driver, so that the bios can be debugged, and to serve as */
-/* parent for the coh1000t.bin file, so that we do not have to include */
-/* it in every zip file */
-
-GAMEX( 1996, atpsx,    0,        zn,       zn, zn,   ROT0, "Atari", "Atari PSX", NOT_A_DRIVER )
-
-GAMEX( 1996, primrag2, 0,        zn,       zn, zn,   ROT0, "Atari", "Primal Rage 2", GAME_UNEMULATED_PROTECTION | GAME_NO_SOUND | GAME_NOT_WORKING )
+GAMEX( 1995, coh1000w,  0,        coh1000w, tps2p,    coh1000w, ROT0,   "Atari", "Time Warner ZN-1", NOT_A_DRIVER )
+GAMEX( 1997, primrag2,  coh1000w, coh1000w, primrag2, coh1000w, ROT0,   "Atari", "Primal Rage II (Test Version 0.36a)", 0 )
 
 /* Acclaim */
 
@@ -5091,11 +6052,13 @@ GAMEX( 1996, primrag2, 0,        zn,       zn, zn,   ROT0, "Atari", "Primal Rage
 /* parent for the coh1000a.bin file, so that we do not have to include */
 /* it in every zip file */
 
-GAMEX( 1996, acpsx,    0,        zn,       zn, zn,   ROT0, "Acclaim", "Acclaim PSX", NOT_A_DRIVER )
 
-GAMEX( 1996, nbajamex, acpsx,    zn,       zn, zn,   ROT0, "Acclaim", "NBA Jam Extreme", GAME_UNEMULATED_PROTECTION | GAME_NO_SOUND | GAME_NOT_WORKING )
-GAMEX( 1996, jdredd,   acpsx,    zn,       zn, zn,   ROT0, "Acclaim", "Judge Dredd (Rev C)", GAME_UNEMULATED_PROTECTION | GAME_NO_SOUND | GAME_NOT_WORKING )
-GAMEX( 1996, jdreddb,  jdredd,   zn,       zn, zn,   ROT0, "Acclaim", "Judge Dredd (Rev B)", GAME_UNEMULATED_PROTECTION | GAME_NO_SOUND | GAME_NOT_WORKING )
+
+GAMEX( 1995, coh1000a,  0,        jdredd,   jdredd,   jdredd,   ROT0,   "Acclaim", "Acclaim ZN-1", NOT_A_DRIVER )
+GAMEX( 1996, jdredd,    coh1000a, jdredd,   jdredd,   jdredd,   ROT0,   "Acclaim", "Judge Dredd (Rev C Dec. 17 1997)", 0 )
+GAMEX( 1996, jdreddb,   jdredd,   jdredd,   jdredd,   jdredd,   ROT0,   "Acclaim", "Judge Dredd (Rev B Nov. 26 1997)", 0 )
+GAMEX( 1996, nbajamex,  coh1000a, nbajamex, nbajamex, nbajamex, ROT0,   "Acclaim", "NBA Jam Extreme (ver. 1.10I)", 0 )
+GAMEX( 1996, nbajamexa, nbajamex, nbajamex, nbajamex, nbajamex, ROT0,   "Acclaim", "NBA Jam Extreme (ver. 1.04)", 0 )
 
 /* Tecmo TPS */
 
@@ -5162,17 +6125,13 @@ GAMEX( 1997, gdarius,   gdarius2, coh1002tb, znt2p,    coh1002tb, ROT0, "Taito",
 GAMEX( 1997, gdariusu,  gdarius2, coh1002tb, znt2p,    coh1002tb, ROT0, "Taito America", "G-Darius (Ver 2.02A)", 0 )
 GAMEX( 1997, gdariusj,  gdarius2, coh1002tb, znt2p,    coh1002tb, ROT0, "Taito", "G-Darius (Ver 2.01J)", 0 )
 
-/* Taito FX1, old BIOS layout: parent of the Beastorizer bootleg only */
-
-GAMEX( 1995, taitofx1, 0,        zn,       zn, zn,   ROT0, "Sony/Taito", "Taito FX1", NOT_A_DRIVER )
-
 /* Eighting / Raizing (COH-1002E) */
 
 GAMEX( 1996, coh1002e,  0,        coh1002e, znt2p,    coh1002e, ROT0,   "Eighting / Raizing", "Eighting / Raizing ZN-1", NOT_A_DRIVER )
 GAMEX( 1997, beastrzr,  coh1002e, coh1002e, znt2p,    coh1002e, ROT0,   "Eighting / Raizing", "Beastorizer (USA, Sep 22 1997)", 0 )
 GAMEX( 1997, beastrzra, beastrzr, coh1002e, znt2p,    coh1002e, ROT0,   "Eighting / Raizing", "Beastorizer (USA, Jun 21 1997)", 0 )
 GAMEX( 1997, bldyroar,  beastrzr, coh1002e, znt2p,    coh1002e, ROT0,   "Eighting / Raizing", "Bloody Roar (Japan, Jun 21 1997)", 0 )
-GAMEX( 1997, beastrzb,  taitofx1, zn,       zn,       zn,       ROT0,   "Eighting/Raizing", "Beastorizer (bootleg)", GAME_UNEMULATED_PROTECTION | GAME_NO_SOUND | GAME_NOT_WORKING )
+GAMEX( 1997, beastrzrb, beastrzr, beastrzrb, znt2p,   coh1002e, ROT0,   "bootleg",            "Beastorizer (USA bootleg)", GAME_NO_SOUND )
 GAMEX( 1998, bldyror2,  coh1002e, coh1002e, bldyror2, coh1002e, ROT0,   "Eighting / Raizing", "Bloody Roar 2 (World)", 0 )
 GAMEX( 1998, bldyror2u, bldyror2, coh1002e, bldyror2, coh1002e, ROT0,   "Eighting / Raizing", "Bloody Roar 2 (USA)", 0 )
 GAMEX( 1998, bldyror2a, bldyror2, coh1002e, bldyror2, coh1002e, ROT0,   "Eighting / Raizing", "Bloody Roar 2 (Asia)", 0 )
