@@ -32,6 +32,7 @@ struct cfg_format
 	int (*read_input_port)(mame_file *, struct InputPort *);
 	int (*read_seq)(mame_file *, InputSeq *);
 	int coin_counters;
+	int has_adjuster_ports;
 };
 
 struct _config_file
@@ -204,8 +205,11 @@ static config_file *config_init(const char *name, int save)
 {
 	static const struct cfg_format formats[] =
 	{
+		/* mame2003-plus with adjuster ports */
+		{ "MAMECFG\xa",	"MAMEDEF\x7",	input_port_read_ver_8, seq_read_ver_8, 8, 1 },
+
 		/* mame 0.74 with 8 coin counters */
-		{ "MAMECFG\x9",	"MAMEDEF\x7",	input_port_read_ver_8, seq_read_ver_8, 8 },
+		{ "MAMECFG\x9",	"MAMEDEF\x7",	input_port_read_ver_8, seq_read_ver_8, 8, 0 },
 	};
 
 	config_file *cfg;
@@ -287,6 +291,74 @@ static unsigned int count_input_ports(const struct InputPort *in)
 
 
 /***************************************************************************
+	port lists saved before the adjuster ports
+
+	PORT_ADJUSTER expanded to nothing in files with the "MAMECFG\x9"
+	header, so they hold the driver's port list without the adjuster
+	entries. Where a driver gained a whole port for its adjusters
+	(polaris), that PORT_START is missing too.
+***************************************************************************/
+
+static int is_adjuster(const struct InputPort *in)
+{
+	return (in->type & ~IPF_MASK) == IPT_ADJUSTER;
+}
+
+/* a PORT_START holding nothing but adjusters */
+static int is_adjuster_only_port(const struct InputPort *in)
+{
+	const struct InputPort *next = in + 1;
+
+	if (in->type != IPT_PORT || !is_adjuster(next))
+		return 0;
+	while (is_adjuster(next))
+		next++;
+	return next->type == IPT_PORT || next->type == IPT_END;
+}
+
+/* a saved PORT_START with no entries after it */
+static int is_empty_saved_port(const struct InputPort *saved, unsigned int s, unsigned int saved_total)
+{
+	return saved[s].type == IPT_PORT && (s + 1 == saved_total || saved[s + 1].type == IPT_PORT);
+}
+
+static int same_port_entry(struct InputPort *a, struct InputPort *b)
+{
+	return a->mask == b->mask &&
+			a->default_value == b->default_value &&
+			a->type == b->type &&
+			seq_cmp(&a->seq, &b->seq) == 0;
+}
+
+/* match a saved port list against the driver's, where only the adjuster */
+/* entries may be missing. map[s] gets the driver entry for saved entry s. */
+static int map_ports_without_adjusters(struct InputPort *driver, struct InputPort *saved,
+		unsigned int saved_total, unsigned int *map)
+{
+	unsigned int d = 0;
+	unsigned int s = 0;
+
+	while (driver[d].type != IPT_END)
+	{
+		if (is_adjuster(&driver[d]))
+			d++;
+		/* canyon kept an empty PORT_START for each adjuster, so only skip */
+		/* the driver's one when the file has no empty port in its place   */
+		else if (is_adjuster_only_port(&driver[d]) &&
+				(s == saved_total || !is_empty_saved_port(saved, s, saved_total)))
+			d++;
+		else if (s < saved_total && same_port_entry(&driver[d], &saved[s]))
+			map[s++] = d++;
+		else
+			return -1;
+	}
+
+	return s == saved_total ? 0 : -1;
+}
+
+
+
+/***************************************************************************
 	config_open
 ***************************************************************************/
 
@@ -331,8 +403,10 @@ int config_read_ports(config_file *cfg, struct InputPort *input_ports_default, s
 {
 	unsigned int total;
 	unsigned int saved_total;
-	struct InputPort *in;
-	struct InputPort saved;
+	unsigned int i;
+	struct InputPort *saved;
+	unsigned int *map;
+	int err = CONFIG_ERROR_CORRUPT;
 	int (*read_input_port)(mame_file *, struct InputPort *);
 
 	if (cfg->is_write || cfg->is_default)
@@ -345,39 +419,50 @@ int config_read_ports(config_file *cfg, struct InputPort *input_ports_default, s
 	/* calculate the size of the array */
 	total = count_input_ports(input_ports_default);
 
-	/* read array size */
-	if (readint(cfg->file, &saved_total) != 0)
+	/* read array size; a file can only lack entries the driver has */
+	if (readint(cfg->file, &saved_total) != 0 || saved_total > total)
 		return CONFIG_ERROR_CORRUPT;
 
-	/* read the original settings and compare them with the ones defined in the driver */
-	in = (struct InputPort *) input_ports_default;
-	while (in->type != IPT_END)
-	{
-		if (read_input_port(cfg->file, &saved) != 0)
-			return CONFIG_ERROR_CORRUPT;
+	saved = malloc((saved_total + 1) * sizeof(*saved));
+	map = malloc((saved_total + 1) * sizeof(*map));
+	if (!saved || !map)
+		goto done;
 
-		if (in->mask != saved.mask ||
-				in->default_value != saved.default_value ||
-				in->type != saved.type ||
-				seq_cmp(&in->seq, &saved.seq) !=0 )
+	/* read the original settings, as the driver defined them when the file was saved */
+	for (i = 0; i < saved_total; i++)
+		if (read_input_port(cfg->file, &saved[i]) != 0)
+			goto done;
+
+	/* they must match the ones defined in the driver now, except that a file */
+	/* in the older format was saved before the adjuster ports existed, so it */
+	/* has none of their entries                                              */
+	if (cfg->format->has_adjuster_ports)
+	{
+		if (saved_total != total)
+			goto done;
+
+		for (i = 0; i < total; i++)
 		{
-			return CONFIG_ERROR_CORRUPT;	/* the default values are different */
+			if (!same_port_entry(&input_ports_default[i], &saved[i]))
+				goto done;	/* the default values are different */
+			map[i] = i;
 		}
-
-		in++;
 	}
+	else if (map_ports_without_adjusters(input_ports_default, saved, saved_total, map) != 0)
+		goto done;
 
-	/* read the current settings */
-	in = input_ports;
-	while (in->type != IPT_END)
-	{
-		if (read_input_port(cfg->file, in) != 0)
+	/* read the current settings; entries missing from the file keep the driver's */
+	for (i = 0; i < saved_total; i++)
+		if (read_input_port(cfg->file, &input_ports[map[i]]) != 0)
 			break;
-		in++;
-	}
 
 	cfg->position = POSITION_AFTER_PORTS;
-	return CONFIG_ERROR_SUCCESS;
+	err = CONFIG_ERROR_SUCCESS;
+
+done:
+	free(saved);
+	free(map);
+	return err;
 }
 
 
