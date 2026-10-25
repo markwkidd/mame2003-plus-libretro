@@ -87,6 +87,9 @@ enum
 	UI_returntogame,
 	UI_cheat,
 	UI_memorycard,
+	UI_processor_clocks,
+	UI_settings_not_saved,
+	UI_reset_values,
 
 	/* input stuff */
 	UI_keyjoyspeed,

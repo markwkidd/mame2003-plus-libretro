@@ -48,7 +48,7 @@ static const char *mame_default_text[] =
 	"Vector Flicker",
 	"Vector Intensity",
 	"Overclock",
-	"ALL CPUS",
+	"SCALE ALL CPUS",
 	"History not available",
 
 	/* special characters */
@@ -88,6 +88,9 @@ static const char *mame_default_text[] =
 	"Return to Game",
 	"Cheat",
 	"Memory Card",
+	"CPU Clocks",
+	"Note: Settings cannot be saved.",
+	"Reset Values",
 
 	/* input */
 	"Key/Joy Speed",

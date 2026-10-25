@@ -2208,6 +2208,179 @@ static int settraksettings(struct mame_bitmap *bitmap,int selected)
 	return sel + 1;
 }
 
+/* CPU Clocks: adjust each CPU's clock scale from 1% to 200% in 1% steps, reimplementing       */
+/* the overclock adjustment from the MAME 0.78 sliders menu. Changes last for the session.     */
+#define PROCESSOR_CLOCK_MIN 1
+#define PROCESSOR_CLOCK_MAX 200
+
+static int processor_clock_percent(int cpu)
+{
+	return (int)(100 * timer_get_overclock(cpu) + 0.5);
+}
+
+static void adjust_processor_clock(int cpu, int increment)
+{
+	int percent = processor_clock_percent(cpu) + increment;
+
+	if (percent < PROCESSOR_CLOCK_MIN) percent = PROCESSOR_CLOCK_MIN;
+	if (percent > PROCESSOR_CLOCK_MAX) percent = PROCESSOR_CLOCK_MAX;
+	timer_set_overclock(cpu, percent / 100.0);
+}
+
+/* ALL CPUS scales every CPU together, keeping their ratios, in steps of 5% of the clocks they */
+/* had when the scaling started (like the proportional mode of the 0.78 mixer sliders). The   */
+/* starting clocks are retaken whenever a CPU has been changed some other way.                */
+#define PROCESSOR_CLOCKS_ALL_STEP 5
+
+static int all_cpus_baseline[MAX_CPU];
+static int all_cpus_scale = 100;	/* percent of all_cpus_baseline */
+
+static int scaled_processor_clock(int cpu, int scale)
+{
+	return (all_cpus_baseline[cpu] * scale + 50) / 100;
+}
+
+static void scale_all_processor_clocks(int cpus, int increment)
+{
+	int cpu, scale;
+
+	/* retake the starting clocks unless every CPU still has the clock the last step gave it */
+	for (cpu = 0; cpu < cpus; cpu++)
+		if (processor_clock_percent(cpu) != scaled_processor_clock(cpu, all_cpus_scale))
+			break;
+	if (cpu < cpus)
+	{
+		for (cpu = 0; cpu < cpus; cpu++)
+			all_cpus_baseline[cpu] = processor_clock_percent(cpu);
+		all_cpus_scale = 100;
+	}
+
+	/* refuse a step that would push any CPU out of range, so the ratios stay intact */
+	scale = all_cpus_scale + increment * PROCESSOR_CLOCKS_ALL_STEP;
+	for (cpu = 0; cpu < cpus; cpu++)
+	{
+		int percent = scaled_processor_clock(cpu, scale);
+
+		if (percent < PROCESSOR_CLOCK_MIN || percent > PROCESSOR_CLOCK_MAX)
+			return;
+	}
+
+	all_cpus_scale = scale;
+	for (cpu = 0; cpu < cpus; cpu++)
+		timer_set_overclock(cpu, scaled_processor_clock(cpu, scale) / 100.0);
+}
+
+/* number of non-selectable title lines at the top of the CPU Clocks menu */
+#define PROCESSOR_CLOCKS_HEADER_LINES 2
+
+static int processor_clocks_menu(struct mame_bitmap *bitmap,int selected)
+{
+	const char *menu_item[PROCESSOR_CLOCKS_HEADER_LINES + MAX_CPU + 4];
+	const char *menu_subitem[PROCESSOR_CLOCKS_HEADER_LINES + MAX_CPU + 4];
+	char label[MAX_CPU + 1][30];
+	char setting[MAX_CPU][10];
+	int sel, total, selectable, cpu, cpus, increment;
+	int all_cpus_item = -1;
+	int reset_item;
+	int arrowize = 0;
+
+
+	sel = selected - 1;
+
+	cpus = cpu_gettotalcpu();
+	total = 0;
+
+	/* title lines: shown without a setting and skipped when moving the selection */
+	menu_item[total] = ui_getstring (UI_processor_clocks);
+	menu_subitem[total] = 0;
+	total++;
+	menu_item[total] = ui_getstring (UI_settings_not_saved);
+	menu_subitem[total] = 0;
+	total++;
+
+	for (cpu = 0; cpu < cpus; cpu++)
+	{
+		sprintf(label[cpu], "%s %d", ui_getstring (UI_cpu), cpu);
+		sprintf(setting[cpu], "%3d%%", processor_clock_percent(cpu));
+		menu_item[total] = label[cpu];
+		menu_subitem[total] = setting[cpu];
+		total++;
+	}
+
+	/* the all CPUs entry has no value of its own: its setting shows the step it scales every CPU by */
+	if (cpus > 1)
+	{
+		all_cpus_item = total;
+		strcpy(label[cpus], ui_getstring (UI_allcpus));
+		menu_item[total] = label[cpus];
+		menu_subitem[total] = "5%";
+		total++;
+	}
+
+	reset_item = total;
+	menu_item[total] = ui_getstring (UI_reset_values);
+	menu_subitem[total] = 0;
+	total++;
+
+	menu_item[total] = ui_getstring (UI_returntomain);
+	menu_subitem[total] = 0;	/* no subitem */
+	total++;
+	menu_item[total] = 0;	/* terminate array */
+
+	selectable = total - PROCESSOR_CLOCKS_HEADER_LINES;
+	if (sel < PROCESSOR_CLOCKS_HEADER_LINES)
+		sel = PROCESSOR_CLOCKS_HEADER_LINES;
+
+	/* only the CPU and all CPUs lines, above Reset Values, take left/right */
+	if (sel < reset_item) arrowize = 3;
+
+	ui_displaymenu(bitmap,menu_item,menu_subitem,0,sel,arrowize);
+
+	if (input_ui_pressed_repeat(IPT_UI_DOWN,8))
+		sel = PROCESSOR_CLOCKS_HEADER_LINES + (sel - PROCESSOR_CLOCKS_HEADER_LINES + 1) % selectable;
+
+	if (input_ui_pressed_repeat(IPT_UI_UP,8))
+		sel = PROCESSOR_CLOCKS_HEADER_LINES + (sel - PROCESSOR_CLOCKS_HEADER_LINES + selectable - 1) % selectable;
+
+	increment = 0;
+	if (input_ui_pressed_repeat(IPT_UI_LEFT,8))
+		increment = -1;
+	if (input_ui_pressed_repeat(IPT_UI_RIGHT,8))
+		increment = 1;
+
+	if (increment && sel < reset_item)
+	{
+		if (sel == all_cpus_item)
+			scale_all_processor_clocks(cpus, increment);
+		else
+			adjust_processor_clock(sel - PROCESSOR_CLOCKS_HEADER_LINES, increment);
+	}
+
+	if (input_ui_pressed(IPT_UI_SELECT))
+	{
+		if (sel == reset_item)
+		{
+			for (cpu = 0; cpu < cpus; cpu++)
+				timer_set_overclock(cpu, 1.0);
+		}
+		else if (sel == total - 1)
+			sel = -1;
+	}
+
+	if (input_ui_pressed(IPT_UI_CANCEL))
+		sel = -1;
+
+	if (input_ui_pressed(IPT_UI_CONFIGURE))
+		sel = -2;
+
+	if (sel == -1 || sel == -2)
+	{
+		schedule_full_refresh();
+	}
+
+	return sel + 1;
+}
+
 static int mame_stats(struct mame_bitmap *bitmap,int selected)
 {
 	char temp[10];
@@ -3090,7 +3263,7 @@ int memcard_menu(struct mame_bitmap *bitmap, int selection)
 }
 
 
-enum { UI_SWITCH = 0,UI_DEFCODE,UI_CODE,UI_FLUSH_CURRENT_CFG, UI_FLUSH_ALL_CFG, UI_ANALOG,UI_CALIBRATE,
+enum { UI_SWITCH = 0,UI_DEFCODE,UI_CODE,UI_FLUSH_CURRENT_CFG, UI_FLUSH_ALL_CFG, UI_ANALOG,UI_PROCESSOR_CLOCKS,UI_CALIBRATE,
 		UI_STATS,UI_GAMEINFO, UI_HISTORY,
 		UI_CHEAT,UI_RESET, UI_GENERATE_XML_DAT, UI_MEMCARD,UI_RAPIDFIRE,UI_EXIT };
 
@@ -3158,6 +3331,8 @@ void setup_menu_init(void)
 		}
 	}
 
+	menu_item[menu_total] = ui_getstring (UI_processor_clocks); menu_action[menu_total++] = UI_PROCESSOR_CLOCKS;
+
 	/* Joystick calibration possible? - not implemented in the libretro port as of May 2018*/
 	if ( osd_joystick_needs_calibration() != 0)
 	{
@@ -3219,6 +3394,9 @@ static int setup_menu(struct mame_bitmap *bitmap, int selected)
 			case UI_ANALOG:
 				res = settraksettings(bitmap, sel >> SEL_BITS);
 				break;
+			case UI_PROCESSOR_CLOCKS:
+				res = processor_clocks_menu(bitmap, sel >> SEL_BITS);
+				break;
 			case UI_CALIBRATE:
 				res = calibratejoysticks(bitmap, sel >> SEL_BITS);
 				break;
@@ -3268,6 +3446,7 @@ static int setup_menu(struct mame_bitmap *bitmap, int selected)
 			case UI_DEFCODE:
 			case UI_CODE:
 			case UI_ANALOG:
+			case UI_PROCESSOR_CLOCKS:
 			case UI_CALIBRATE:
 			case UI_STATS:
 			case UI_GAMEINFO:
