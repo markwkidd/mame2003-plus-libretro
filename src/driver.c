@@ -2784,6 +2784,45 @@ V-V                           TP-027
 	DRIVER( raystormo )	/* RayStorm (Ver 2.05O) */
 	DRIVER( raystormu )	/* RayStorm (Ver 2.05A) */
 	DRIVER( raystormj )	/* RayStorm (Ver 2.05J) */
+	DRIVER( chaoshea )	/* Chaos Heat (V2.09O 1998/10/02 17:00) */
+	DRIVER( chaosheaj )	/* Chaos Heat (V2.08J 1998/09/25 17:00) */
+	DRIVER( raycris )	/* RayCrisis (V2.03O 1998/11/15 15:43) */
+	DRIVER( raycrisj )	/* RayCrisis (V2.03J 1998/11/15 15:43) */
+	DRIVER( spuzbobl )	/* Super Puzzle Bobble (V2.05O 1999/2/24 18:00) */
+	DRIVER( spuzboblj )	/* Super Puzzle Bobble (V2.04J 1999/2/17 02:10) */
+	DRIVER( gobyrc )	/* Go By RC (V2.03O 1999/05/25 13:31) */
+	DRIVER( rcdego )	/* RC De Go (V2.03J 1999/05/22 19:29) */
+	DRIVER( flipmaze )	/* Flip Maze (V2.04J 1999/09/02 20:00) */
+	DRIVER( mawasunda )	/* Mawasunda!! (V2.08J 2000/02/01 11:02:54) */
+	DRIVER( shikigam )	/* Shikigami no Shiro (V2.03J 2001/08/07 18:11) */
+	DRIVER( shikigama )	/* Shikigami no Shiro - internal build (V1.02J 2001/09/27 18:45) */
+	DRIVER( sianniv )	/* Space Invaders Anniversary (V2.02J 2003/09/12 20:00) */
+	DRIVER( kollon )	/* Kollon (V2.04JA 2003/11/01 12:00) */
+	DRIVER( kollonc )	/* Kollon (V2.04JC 2003/11/01 12:00) */
+	DRIVER( otenamih )	/* Otenami Haiken (V2.04J 1999/02/01 18:00:00) */
+	DRIVER( psyvaria )	/* Psyvariar -Medium Unit- (V2.02O 2000/02/22 13:00) */
+	DRIVER( psyvarij )	/* Psyvariar -Medium Unit- (V2.04J 2000/02/15 11:00) */
+	DRIVER( psyvarrv )	/* Psyvariar -Revision- (V2.04J 2000/08/11 22:00) */
+	DRIVER( zokuoten )	/* Zoku Otenamihaiken (V2.05J 2003/05/12 18:00) */
+	DRIVER( zokuotena )	/* Zoku Otenamihaiken (V2.03J 2001/02/16 16:00) */
+	DRIVER( zooo )	/* Zooo (V2.01JA 2004/04/13 12:00) */
+	DRIVER( otenamhf )	/* Otenami Haiken Final (V2.07JC 2005/04/20 15:36) */
+	DRIVER( mahjngoh )	/* Mahjong Oh (V2.06J 1999/11/23 08:52:22) */
+	DRIVER( shanghss )	/* Shanghai Shoryu Sairin (V2.03J 2000/05/26 12:45:28) */
+	DRIVER( soutenry )	/* Soutenryu (V2.07J 2000/12/14 11:13:02) */
+	DRIVER( usagi )	/* Usagi (V2.02J 2001/10/02 12:41:19) */
+	DRIVER( shangtou )	/* Shanghai Sangokuhai Tougi (Ver 2.01J 2002/01/18 18:26:58) */
+	DRIVER( nightrai )	/* Night Raid (V2.03J 2001/02/26 17:00) */
+	DRIVER( otenki )	/* Otenki Kororin (V2.01J 2001/07/02 10:00) */
+	DRIVER( xiistag )	/* XII Stag (V2.01J 2002/6/26 22:27) */
+	DRIVER( aerofgtsg )	/* Aero Fighters Special (VER 1.00G) */
+	DRIVER( brvbladeg )	/* Brave Blade (VER 1.40G) */
+	DRIVER( flamegung )	/* Flame Gunner (VER 1.40G) */
+	DRIVER( ftimpactg )	/* Fighters' Impact (VER 2.10G) */
+	DRIVER( gdariusg )	/* G-Darius (VER 2.70G) */
+	DRIVER( raystormg )	/* RayStorm (VER 2.60G) */
+	DRIVER( shngmtkbg )	/* Shanghai Matekibuyuu (VER 1.20G) */
+	DRIVER( tblkkuzug )	/* The Block Kuzushi (VER 1.10G) */
 	DRIVER( ftimpcta )	/* Fighters' Impact A (Ver 2.00J) */
 	DRIVER( ftimpact )	/* Fighters' Impact (Ver 2.02O) */
 	DRIVER( ftimpactu )	/* Fighters' Impact (Ver 2.02A) */
@@ -2886,7 +2925,20 @@ V-V                           TP-027
 	DRIVER( g13knd )	/* Golgo 13 Kiseki no Dandou (Japan, GLS1/VER.A) */
 
 	/* Namco System 10 */
-	DRIVER( mrdrilr2 )	/* Mr Driller 2 */
+	DRIVER( mrdrilr2 )	/* Mr. Driller 2 (World, DR22 Ver.A) */
+	DRIVER( mrdrilr2j )	/* Mr. Driller 2 (Japan, DR21 Ver.A) */
+	DRIVER( mrdrilr2u )	/* Mr. Driller 2 (US, DR23 Ver.A) */
+	DRIVER( gjspace )	/* GekiToride-Jong Space (10011 Ver.A) */
+	DRIVER( knpuzzle )	/* Kotoba no Puzzle Mojipittan (Japan, KPM1 Ver.A) */
+	DRIVER( mrdrilrg )	/* Mr. Driller G (Japan, DRG1 Ver.A) */
+	DRIVER( chocovdr )	/* Uchuu Daisakusen: Chocovader Contactee (Japan, CVC1 Ver.A) */
+	DRIVER( gamshara )	/* Gamshara (20020912A / 10021 Ver.A) */
+	DRIVER( gamsharao )	/* Gamshara (20020716A / 10021 Ver.A) */
+	DRIVER( panikuru )	/* Panikuru Panekuru (Japan, PPA1 Ver.A) */
+	DRIVER( startrgn )	/* Star Trigon (Japan, STT1 Ver.A) */
+	DRIVER( konotako )	/* Kono e Tako (10021 Ver.A) */
+	DRIVER( ptblank3 )	/* Point Blank 3 (World, GNN2 Ver.A) */
+	DRIVER( gunbalina )	/* Gunbalina (Japan, GNN1 Ver.A) */
 
 	/* Konami GQ */
 	DRIVER( cryptklr )
@@ -5204,6 +5256,65 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	DRIVER( nzeroteamb )	/* New Zero Team (V33 SYSTEM TYPE_B hardware, Haoyunlai Trading Company license) */
 	DRIVER( zerotm2k )	/* Zero Team 2000 */
 
+	/* Seibu SPI / SYS386I games */
+	DRIVER( senkyu )	/* Senkyu (Japan, newer) */
+	DRIVER( senkyua )	/* Senkyu (Japan, earlier) */
+	DRIVER( batlball )	/* Battle Balls (Germany, newer) */
+	DRIVER( batlballo )	/* Battle Balls (Germany, earlier) */
+	DRIVER( batlballu )	/* Battle Balls (US) */
+	DRIVER( batlballa )	/* Battle Balls (Hong Kong) */
+	DRIVER( batlballe )	/* Battle Balls (Hong Kong, earlier) */
+	DRIVER( batlballpt )	/* Battle Balls (Portugal) */
+	DRIVER( viprp1 )	/* Viper Phase 1 (New Version, World) */
+	DRIVER( viprp1k )	/* Viper Phase 1 (New Version, Korea) */
+	DRIVER( viprp1u )	/* Viper Phase 1 (New Version, US set 1) */
+	DRIVER( viprp1ua )	/* Viper Phase 1 (New Version, US set 2) */
+	DRIVER( viprp1j )	/* Viper Phase 1 (New Version, Japan) */
+	DRIVER( viprp1s )	/* Viper Phase 1 (New Version, Switzerland) */
+	DRIVER( viprp1h )	/* Viper Phase 1 (New Version, Holland) */
+	DRIVER( viprp1t )	/* Viper Phase 1 (New Version, Germany) */
+	DRIVER( viprp1pt )	/* Viper Phase 1 (New Version, Portugal) */
+	DRIVER( viprp1ot )	/* Viper Phase 1 (Germany) */
+	DRIVER( viprp1oj )	/* Viper Phase 1 (Japan) */
+	DRIVER( viprp1hk )	/* Viper Phase 1 (Hong Kong) */
+	DRIVER( rdft )	/* Raiden Fighters (Germany) */
+	DRIVER( rdftj )	/* Raiden Fighters (Japan, earlier) */
+	DRIVER( rdftja )	/* Raiden Fighters (Japan, earliest) */
+	DRIVER( rdftu )	/* Raiden Fighters (US, earlier) */
+	DRIVER( rdftauge )	/* Raiden Fighters (Evaluation Software For Show, Germany) */
+	DRIVER( rdftua )	/* Raiden Fighters (US, newer) */
+	DRIVER( rdftjb )	/* Raiden Fighters (Japan, newer) */
+	DRIVER( rdftau )	/* Raiden Fighters (Australia) */
+	DRIVER( rdftam )	/* Raiden Fighters (Hong Kong) */
+	DRIVER( rdftadi )	/* Raiden Fighters (Korea, SUB4 cart) */
+	DRIVER( rdfta )	/* Raiden Fighters (Austria) */
+	DRIVER( rdftgb )	/* Raiden Fighters (Great Britain) */
+	DRIVER( rdftgr )	/* Raiden Fighters (Greece) */
+	DRIVER( rdftit )	/* Raiden Fighters (Italy) */
+	DRIVER( rdftadia )	/* Raiden Fighters (Korea, SUB2 cart) */
+	DRIVER( rdft2 )	/* Raiden Fighters 2 - Operation Hell Dive (Germany) */
+	DRIVER( rdft2j )	/* Raiden Fighters 2 - Operation Hell Dive (Japan set 1) */
+	DRIVER( rdft2a )	/* Raiden Fighters 2 - Operation Hell Dive (Hong Kong) */
+	DRIVER( rdft2s )	/* Raiden Fighters 2 - Operation Hell Dive (Switzerland) */
+	DRIVER( rdft2ja )	/* Raiden Fighters 2 - Operation Hell Dive (Japan set 2) */
+	DRIVER( rdft2aa )	/* Raiden Fighters 2 - Operation Hell Dive (Korea) */
+	DRIVER( rdft2it )	/* Raiden Fighters 2 - Operation Hell Dive (Italy) */
+	DRIVER( rdft2jb )	/* Raiden Fighters 2 - Operation Hell Dive (Japan set 3) */
+	DRIVER( rdft2jc )	/* Raiden Fighters 2 - Operation Hell Dive (Japan set 4) */
+	DRIVER( rdft2t )	/* Raiden Fighters 2 - Operation Hell Dive (Taiwan) */
+	DRIVER( rdft2u )	/* Raiden Fighters 2 - Operation Hell Dive (US) */
+	DRIVER( rfjet )	/* Raiden Fighters Jet (Germany) */
+	DRIVER( rfjetu )	/* Raiden Fighters Jet (US) */
+	DRIVER( rfjetj )	/* Raiden Fighters Jet (Japan) */
+	DRIVER( rfjeta )	/* Raiden Fighters Jet (Korea) */
+	DRIVER( rfjett )	/* Raiden Fighters Jet (Taiwan) */
+	DRIVER( rdfts )	/* Raiden Fighters (Taiwan, single board) */
+	DRIVER( rdft2us )	/* Raiden Fighters 2 - Operation Hell Dive (US, single board) */
+	DRIVER( rfjets )	/* Raiden Fighters Jet (US, single board) */
+	DRIVER( rfjetsa )	/* Raiden Fighters Jet (US, single board, test version?) */
+	DRIVER( rdft22kc )	/* Raiden Fighters 2 - Operation Hell Dive 2000 (China, SYS386I) */
+	DRIVER( rfjet2kc )	/* Raiden Fighters Jet 2000 (China, SYS386I) */
+
 /* Seibu STI System games:
 	Viper: Phase 1 					(c) 1995
 	Viper: Phase 1 (New version)	(c) 1996
@@ -5488,6 +5599,10 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 
 	/* Kaneko games */
 	DRIVER( jumpkun )   /* (c) 1984 Kaneko */
+	DRIVER( hvyunit )	/* (c) 1988 Kaneko + Taito */
+	DRIVER( hvyunitj )	/* (c) 1988 Kaneko + Taito (Japan) */
+	DRIVER( hvyunitjo )	/* (c) 1988 Kaneko + Taito (Japan Older) */
+	DRIVER( hvyunitu )	/* (c) 1988 Kaneko + Taito (USA) */
   DRIVER( djboy )		  /* (c) 1989 Kaneko */
 	DRIVER( djboyj )	  /* (c) 1989 Kaneko */
 	DRIVER( airbustr )	/* (c) 1990 Kaneko + Namco */
@@ -5831,7 +5946,10 @@ Other Sun games
 
 	/* Fuuki FG-3 games */
 	DRIVER( asurabld )	/* (c) 1998 (Japan) */
-	DRIVER( asurabus )	/* (c) 2000 (Japan) */
+	DRIVER( asurabus )	/* (c) 2001 (USA) */
+	DRIVER( asurabusj )	/* (c) 2000 (Japan) */
+	DRIVER( asurabusja )	/* (c) 2000 (Japan) */
+	DRIVER( asurabusjr )	/* (c) 2000 (Japan) */
 
 	/* Unico games */
 	DRIVER( drgnmst )	/* (c) 1994 */

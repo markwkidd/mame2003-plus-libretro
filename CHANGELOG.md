@@ -283,6 +283,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 
 ## New Clones
 
+* Asura Buster - Eternal Warriors (USA), (Japan, set 2) and (Japan) (ARCADIA review build) - Romsets `asurabus`, `asurabusja`, `asurabusjr`; the Japan set 1 is now `asurabusj`, as in current MAME
 * Battle Shark (Japan, Joystick)
 * Botanic (French version)
 * Bubble Bobble (prototype on tokio hardware)
@@ -588,6 +589,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Air Buster
 * Ashita no Joe
 * Asterix
+* Asura Blade, Asura Buster (no more repeated voices and sound effects)
 * Athena
 * Bandito
 * Big Event Golf
@@ -704,6 +706,8 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 
 
 ## New and/or Recommended Input Options and Settings
+
+* Ikari (joystick hack bootleg): dual stick aiming. Set the 'Aim with Right Stick' DIP switch to On (Tab menu, Dip Switches): the player walks with the left stick and aims and fires with the right stick; with the right stick released he fires where he walks, as before. Off by default.
 
 * Added 'X-Way Joystick' Option to Analog Controls Menu only for IPT_DIAL and IPT_DIAL_V devices.  This option is for use with x-way rotary joysticks (where the joystick can rotate X discrete steps, 8 or 12 appears to be most common).  The joystick can still move up, down, left, right and diagonally. The most famous game to use this control scheme is Ikari Warriors.
 Notes on this option:
