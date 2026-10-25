@@ -90,6 +90,7 @@ static const char *mame_default_text[] =
 	"Memory Card",
 	"Sound Mixer",
 	"Reset Values",
+	"Discrete",
 
 	/* input */
 	"Key/Joy Speed",

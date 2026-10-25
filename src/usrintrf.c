@@ -2278,14 +2278,48 @@ static int count_mixer_channels(int *channel)
 	return channels;
 }
 
+/* Discrete adjusters: PORT_ADJUSTER input ports holding a 0-100 setting that DISCRETE_ADJUSTMENT */
+/* nodes read, reimplementing the discrete adjusters of the MAME 0.78 sliders menu. The setting */
+/* lives in the port's default_value, so it is saved in the game's .cfg like a dip switch.      */
+#define MAX_ADJUSTERS 8
+#define ADJUSTER_MIN 0
+#define ADJUSTER_MAX 100
+
+static int count_adjusters(struct InputPort **adjuster)
+{
+	struct InputPort *in;
+	int adjusters = 0;
+
+	for (in = Machine->input_ports; in->type != IPT_END && adjusters < MAX_ADJUSTERS; in++)
+		if ((in->type & ~IPF_MASK) == IPT_ADJUSTER)
+			adjuster[adjusters++] = in;
+	return adjusters;
+}
+
+static void adjust_adjuster(struct InputPort *in, int increment)
+{
+	int value = in->default_value + increment;
+
+	if (value < ADJUSTER_MIN) value = ADJUSTER_MIN;
+	if (value > ADJUSTER_MAX) value = ADJUSTER_MAX;
+	in->default_value = value;
+}
+
+static void reset_adjuster(struct InputPort *in)
+{
+	in->default_value = Machine->input_ports_default[in - Machine->input_ports].default_value;
+}
+
 static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
 {
-	const char *menu_item[SOUND_MIXER_HEADER_LINES + MIXER_MAX_CHANNELS + 4];
-	const char *menu_subitem[SOUND_MIXER_HEADER_LINES + MIXER_MAX_CHANNELS + 4];
-	char setting[MIXER_MAX_CHANNELS][10];
+	const char *menu_item[SOUND_MIXER_HEADER_LINES + MIXER_MAX_CHANNELS + MAX_ADJUSTERS + 5];
+	const char *menu_subitem[SOUND_MIXER_HEADER_LINES + MIXER_MAX_CHANNELS + MAX_ADJUSTERS + 5];
+	char setting[MIXER_MAX_CHANNELS + MAX_ADJUSTERS][10];
 	int channel[MIXER_MAX_CHANNELS];
-	int sel, total, selectable, i, channels, increment;
+	struct InputPort *adjuster[MAX_ADJUSTERS];
+	int sel, total, selectable, i, channels, adjusters, increment;
 	int all_channels_item = -1;
+	int discrete_item = -1;
 	int reset_item;
 	int arrowize = 0;
 
@@ -2293,6 +2327,7 @@ static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
 	sel = selected - 1;
 
 	channels = count_mixer_channels(channel);
+	adjusters = count_adjusters(adjuster);
 	total = 0;
 
 	/* title line: shown without a setting and skipped when moving the selection */
@@ -2317,6 +2352,23 @@ static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
 		total++;
 	}
 
+	/* the Discrete heading: shown without a setting and skipped when moving the selection */
+	if (adjusters)
+	{
+		discrete_item = total;
+		menu_item[total] = ui_getstring (UI_discrete);
+		menu_subitem[total] = 0;
+		total++;
+
+		for (i = 0; i < adjusters; i++)
+		{
+			sprintf(setting[channels + i], "%3d%%", adjuster[i]->default_value);
+			menu_item[total] = input_port_name(adjuster[i]);
+			menu_subitem[total] = setting[channels + i];
+			total++;
+		}
+	}
+
 	reset_item = total;
 	menu_item[total] = ui_getstring (UI_reset_values);
 	menu_subitem[total] = 0;
@@ -2331,16 +2383,24 @@ static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
 	if (sel < SOUND_MIXER_HEADER_LINES)
 		sel = SOUND_MIXER_HEADER_LINES;
 
-	/* only the channel and all channels lines, above Reset Values, take left/right */
+	/* only the channel, all channels and adjuster lines, above Reset Values, take left/right */
 	if (sel < reset_item) arrowize = 3;
 
 	ui_displaymenu(bitmap,menu_item,menu_subitem,0,sel,arrowize);
 
 	if (input_ui_pressed_repeat(IPT_UI_DOWN,8))
+	{
 		sel = SOUND_MIXER_HEADER_LINES + (sel - SOUND_MIXER_HEADER_LINES + 1) % selectable;
+		if (sel == discrete_item)
+			sel++;
+	}
 
 	if (input_ui_pressed_repeat(IPT_UI_UP,8))
+	{
 		sel = SOUND_MIXER_HEADER_LINES + (sel - SOUND_MIXER_HEADER_LINES + selectable - 1) % selectable;
+		if (sel == discrete_item)
+			sel = (sel > SOUND_MIXER_HEADER_LINES) ? sel - 1 : total - 1;
+	}
 
 	increment = 0;
 	if (input_ui_pressed_repeat(IPT_UI_LEFT,8))
@@ -2352,6 +2412,8 @@ static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
 	{
 		if (sel == all_channels_item)
 			scale_all_mixer_levels(channel, channels, increment);
+		else if (discrete_item >= 0 && sel > discrete_item)
+			adjust_adjuster(adjuster[sel - discrete_item - 1], increment);
 		else
 			adjust_mixer_level(channel[sel - SOUND_MIXER_HEADER_LINES], increment);
 	}
@@ -2362,6 +2424,8 @@ static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
 		{
 			for (i = 0; i < channels; i++)
 				mixer_set_mixing_level(channel[i], mixer_get_default_mixing_level(channel[i]));
+			for (i = 0; i < adjusters; i++)
+				reset_adjuster(adjuster[i]);
 		}
 		else if (sel == total - 1)
 			sel = -1;
@@ -3331,11 +3395,12 @@ void setup_menu_init(void)
 		}
 	}
 
-	/* Determine if there are any mixer channels */
+	/* Determine if there are any mixer channels or discrete adjusters */
 	{
 		int channel[MIXER_MAX_CHANNELS];
+		struct InputPort *adjuster[MAX_ADJUSTERS];
 
-		if (count_mixer_channels(channel) != 0)
+		if (count_mixer_channels(channel) != 0 || count_adjusters(adjuster) != 0)
 		{
 			menu_item[menu_total] = ui_getstring (UI_sound_mixer); menu_action[menu_total++] = UI_SOUND_MIXER;
 		}

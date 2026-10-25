@@ -89,6 +89,7 @@ enum
 	UI_memorycard,
 	UI_sound_mixer,
 	UI_reset_values,
+	UI_discrete,
 
 	/* input stuff */
 	UI_keyjoyspeed,
