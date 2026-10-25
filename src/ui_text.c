@@ -42,7 +42,7 @@ static const char *mame_default_text[] =
 	"Text",
 	"Volume",
 	"Relative",
-	"ALL CHANNELS",
+	"SCALE ALL CHANNELS",
 	"Brightness",
 	"Gamma",
 	"Vector Flicker",
@@ -88,6 +88,8 @@ static const char *mame_default_text[] =
 	"Return to Game",
 	"Cheat",
 	"Memory Card",
+	"Sound Mixer",
+	"Reset Values",
 
 	/* input */
 	"Key/Joy Speed",

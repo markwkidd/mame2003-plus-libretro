@@ -2208,6 +2208,179 @@ static int settraksettings(struct mame_bitmap *bitmap,int selected)
 	return sel + 1;
 }
 
+/* Sound Mixer: adjust each mixer channel's level from 0% to 100% in 1% steps, reimplementing */
+/* the channel volume adjustment from the MAME 0.78 sliders menu. Levels are saved in the    */
+/* game's .cfg, as in 0.78.                                                                   */
+#define MIXER_LEVEL_MIN 0
+#define MIXER_LEVEL_MAX 100
+
+static void adjust_mixer_level(int channel, int increment)
+{
+	int level = mixer_get_mixing_level(channel) + increment;
+
+	if (level < MIXER_LEVEL_MIN) level = MIXER_LEVEL_MIN;
+	if (level > MIXER_LEVEL_MAX) level = MIXER_LEVEL_MAX;
+	mixer_set_mixing_level(channel, level);
+}
+
+/* SCALE ALL CHANNELS scales every channel together, keeping their ratios, in steps of 5% of */
+/* the levels they had when the scaling started (the proportional mode of the 0.78 mixer     */
+/* sliders). The starting levels are retaken whenever a channel has been changed some other  */
+/* way.                                                                                       */
+#define MIXER_ALL_CHANNELS_STEP 5
+
+static int all_channels_baseline[MIXER_MAX_CHANNELS];
+static int all_channels_scale = 100;	/* percent of all_channels_baseline */
+
+static int scaled_mixer_level(int channel, int scale)
+{
+	return (all_channels_baseline[channel] * scale + 50) / 100;
+}
+
+static void scale_all_mixer_levels(const int *channel, int channels, int increment)
+{
+	int i, scale;
+
+	/* retake the starting levels unless every channel still has the level the last step gave it */
+	for (i = 0; i < channels; i++)
+		if (mixer_get_mixing_level(channel[i]) != scaled_mixer_level(channel[i], all_channels_scale))
+			break;
+	if (i < channels)
+	{
+		for (i = 0; i < channels; i++)
+			all_channels_baseline[channel[i]] = mixer_get_mixing_level(channel[i]);
+		all_channels_scale = 100;
+	}
+
+	/* refuse a step that would push any channel out of range, so the ratios stay intact */
+	scale = all_channels_scale + increment * MIXER_ALL_CHANNELS_STEP;
+	if (scale < 0)
+		return;
+	for (i = 0; i < channels; i++)
+		if (scaled_mixer_level(channel[i], scale) > MIXER_LEVEL_MAX)
+			return;
+
+	all_channels_scale = scale;
+	for (i = 0; i < channels; i++)
+		mixer_set_mixing_level(channel[i], scaled_mixer_level(channel[i], scale));
+}
+
+/* number of non-selectable title lines at the top of the Sound Mixer menu */
+#define SOUND_MIXER_HEADER_LINES 1
+
+static int count_mixer_channels(int *channel)
+{
+	int ch, channels = 0;
+
+	for (ch = 0; ch < MIXER_MAX_CHANNELS; ch++)
+		if (mixer_get_name(ch) != 0)
+			channel[channels++] = ch;
+	return channels;
+}
+
+static int sound_mixer_menu(struct mame_bitmap *bitmap,int selected)
+{
+	const char *menu_item[SOUND_MIXER_HEADER_LINES + MIXER_MAX_CHANNELS + 4];
+	const char *menu_subitem[SOUND_MIXER_HEADER_LINES + MIXER_MAX_CHANNELS + 4];
+	char setting[MIXER_MAX_CHANNELS][10];
+	int channel[MIXER_MAX_CHANNELS];
+	int sel, total, selectable, i, channels, increment;
+	int all_channels_item = -1;
+	int reset_item;
+	int arrowize = 0;
+
+
+	sel = selected - 1;
+
+	channels = count_mixer_channels(channel);
+	total = 0;
+
+	/* title line: shown without a setting and skipped when moving the selection */
+	menu_item[total] = ui_getstring (UI_sound_mixer);
+	menu_subitem[total] = 0;
+	total++;
+
+	for (i = 0; i < channels; i++)
+	{
+		sprintf(setting[i], "%3d%%", mixer_get_mixing_level(channel[i]));
+		menu_item[total] = mixer_get_name(channel[i]);
+		menu_subitem[total] = setting[i];
+		total++;
+	}
+
+	/* the all channels entry has no value of its own: its setting shows the step it scales every channel by */
+	if (channels > 1)
+	{
+		all_channels_item = total;
+		menu_item[total] = ui_getstring (UI_allchannels);
+		menu_subitem[total] = "5%";
+		total++;
+	}
+
+	reset_item = total;
+	menu_item[total] = ui_getstring (UI_reset_values);
+	menu_subitem[total] = 0;
+	total++;
+
+	menu_item[total] = ui_getstring (UI_returntomain);
+	menu_subitem[total] = 0;	/* no subitem */
+	total++;
+	menu_item[total] = 0;	/* terminate array */
+
+	selectable = total - SOUND_MIXER_HEADER_LINES;
+	if (sel < SOUND_MIXER_HEADER_LINES)
+		sel = SOUND_MIXER_HEADER_LINES;
+
+	/* only the channel and all channels lines, above Reset Values, take left/right */
+	if (sel < reset_item) arrowize = 3;
+
+	ui_displaymenu(bitmap,menu_item,menu_subitem,0,sel,arrowize);
+
+	if (input_ui_pressed_repeat(IPT_UI_DOWN,8))
+		sel = SOUND_MIXER_HEADER_LINES + (sel - SOUND_MIXER_HEADER_LINES + 1) % selectable;
+
+	if (input_ui_pressed_repeat(IPT_UI_UP,8))
+		sel = SOUND_MIXER_HEADER_LINES + (sel - SOUND_MIXER_HEADER_LINES + selectable - 1) % selectable;
+
+	increment = 0;
+	if (input_ui_pressed_repeat(IPT_UI_LEFT,8))
+		increment = -1;
+	if (input_ui_pressed_repeat(IPT_UI_RIGHT,8))
+		increment = 1;
+
+	if (increment && sel < reset_item)
+	{
+		if (sel == all_channels_item)
+			scale_all_mixer_levels(channel, channels, increment);
+		else
+			adjust_mixer_level(channel[sel - SOUND_MIXER_HEADER_LINES], increment);
+	}
+
+	if (input_ui_pressed(IPT_UI_SELECT))
+	{
+		if (sel == reset_item)
+		{
+			for (i = 0; i < channels; i++)
+				mixer_set_mixing_level(channel[i], mixer_get_default_mixing_level(channel[i]));
+		}
+		else if (sel == total - 1)
+			sel = -1;
+	}
+
+	if (input_ui_pressed(IPT_UI_CANCEL))
+		sel = -1;
+
+	if (input_ui_pressed(IPT_UI_CONFIGURE))
+		sel = -2;
+
+	if (sel == -1 || sel == -2)
+	{
+		schedule_full_refresh();
+	}
+
+	return sel + 1;
+}
+
 static int mame_stats(struct mame_bitmap *bitmap,int selected)
 {
 	char temp[10];
@@ -3090,7 +3263,7 @@ int memcard_menu(struct mame_bitmap *bitmap, int selection)
 }
 
 
-enum { UI_SWITCH = 0,UI_DEFCODE,UI_CODE,UI_FLUSH_CURRENT_CFG, UI_FLUSH_ALL_CFG, UI_ANALOG,UI_CALIBRATE,
+enum { UI_SWITCH = 0,UI_DEFCODE,UI_CODE,UI_FLUSH_CURRENT_CFG, UI_FLUSH_ALL_CFG, UI_ANALOG,UI_SOUND_MIXER,UI_CALIBRATE,
 		UI_STATS,UI_GAMEINFO, UI_HISTORY,
 		UI_CHEAT,UI_RESET, UI_GENERATE_XML_DAT, UI_MEMCARD,UI_RAPIDFIRE,UI_EXIT };
 
@@ -3158,6 +3331,16 @@ void setup_menu_init(void)
 		}
 	}
 
+	/* Determine if there are any mixer channels */
+	{
+		int channel[MIXER_MAX_CHANNELS];
+
+		if (count_mixer_channels(channel) != 0)
+		{
+			menu_item[menu_total] = ui_getstring (UI_sound_mixer); menu_action[menu_total++] = UI_SOUND_MIXER;
+		}
+	}
+
 	/* Joystick calibration possible? - not implemented in the libretro port as of May 2018*/
 	if ( osd_joystick_needs_calibration() != 0)
 	{
@@ -3219,6 +3402,9 @@ static int setup_menu(struct mame_bitmap *bitmap, int selected)
 			case UI_ANALOG:
 				res = settraksettings(bitmap, sel >> SEL_BITS);
 				break;
+			case UI_SOUND_MIXER:
+				res = sound_mixer_menu(bitmap, sel >> SEL_BITS);
+				break;
 			case UI_CALIBRATE:
 				res = calibratejoysticks(bitmap, sel >> SEL_BITS);
 				break;
@@ -3268,6 +3454,7 @@ static int setup_menu(struct mame_bitmap *bitmap, int selected)
 			case UI_DEFCODE:
 			case UI_CODE:
 			case UI_ANALOG:
+			case UI_SOUND_MIXER:
 			case UI_CALIBRATE:
 			case UI_STATS:
 			case UI_GAMEINFO:
