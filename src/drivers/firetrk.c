@@ -896,7 +896,7 @@ INPUT_PORTS_START( montecar )
 	PORT_ADJUSTER( 85, "Motor Frequency" )
 
 	PORT_START		/* 9 */
-	PORT_ADJUSTER( 80, "Motor Frequency" )
+	PORT_ADJUSTER( 80, "Drone Motor Frequency" )
 INPUT_PORTS_END
 
 
